@@ -24,23 +24,24 @@ The backend exposes a `StorageAdapter` interface in front of all Google Sheets c
 
 ```
 badminton-analysis/
-├── frontend/                  # Vite + React + TypeScript
-│   ├── src/
-│   │   ├── pages/             # SignupPage, RosterPage, AdminDashboard, AdminPlayers
-│   │   ├── components/
-│   │   └── api/               # Typed API client
-│   └── vite.config.ts
-├── backend/                   # FastAPI (Python)
-│   ├── main.py                # App entrypoint, serves /dist as static files
-│   ├── storage/
-│   │   ├── adapter.py         # StorageAdapter interface
-│   │   └── sheets.py          # Google Sheets implementation
-│   ├── routers/
-│   │   ├── sessions.py        # Session + court CRUD
-│   │   ├── signups.py         # Signup, cancel, lookup
-│   │   └── admin.py           # Admin-only endpoints
-│   └── auth.py                # Google OAuth + admin whitelist check
-└── signups/                   # Existing directory, kept as-is
+└── signups/                   # All signup project files live here
+    ├── frontend/              # Vite + React + TypeScript
+    │   ├── src/
+    │   │   ├── pages/         # SignupPage, RosterPage, AdminDashboard, AdminPlayers
+    │   │   ├── components/
+    │   │   └── api/           # Typed API client
+    │   └── vite.config.ts
+    ├── backend/               # FastAPI (Python)
+    │   ├── main.py            # App entrypoint, serves frontend/dist as static files
+    │   ├── storage/
+    │   │   ├── adapter.py     # StorageAdapter interface
+    │   │   └── sheets.py      # Google Sheets implementation
+    │   ├── routers/
+    │   │   ├── sessions.py    # Session + court CRUD
+    │   │   ├── signups.py     # Signup, cancel, lookup
+    │   │   └── admin.py       # Admin-only endpoints
+    │   └── auth.py            # Google OAuth + admin whitelist check
+    └── docs/                  # Design specs and documentation
 ```
 
 FastAPI serves the built Vite output (`frontend/dist`) as static files. A single deployment unit (Render, Railway, Fly.io, etc.).
