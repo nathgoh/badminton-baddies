@@ -59,6 +59,32 @@ def test_delete_session(client):
     assert list_response.json() == []
 
 
+def test_delete_session_removes_courts(client):
+    session_id = client.post("/api/sessions", json={"name": "S", "date": "2026-03-25"}).json()["id"]
+    client.post(
+        f"/api/sessions/{session_id}/courts",
+        json={"name": "Court A", "start_time": "19:00", "end_time": "22:00", "max_players": 10, "total_cost": 100.0},
+    )
+
+    client.delete(f"/api/sessions/{session_id}")
+
+    admin_response = client.get(f"/api/admin/sessions/{session_id}")
+    assert admin_response.status_code == 404
+
+
+def test_delete_session_removes_signups(client, storage):
+    session_id = client.post("/api/sessions", json={"name": "S", "date": "2026-03-25"}).json()["id"]
+    token = client.get("/api/sessions").json()[0]["access_token"]
+    client.post(
+        f"/api/public/{token}/signup",
+        json={"email": "a@b.com", "name": "Alice", "venmo_or_phone": "555", "payment_agreed": True},
+    )
+
+    client.delete(f"/api/sessions/{session_id}")
+
+    assert storage.get_signups(session_id) == []
+
+
 def test_create_court(client):
     session_response = client.post("/api/sessions", json={"name": "S1", "date": "2026-03-25"})
     session_id = session_response.json()["id"]
