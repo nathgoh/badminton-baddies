@@ -3,12 +3,21 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from services.storage import LocalStorageBackend, get_storage
+from services.storage import StorageBackend, get_storage
 
 router = APIRouter(prefix="/api/tus")
 
 TUS_VERSION = "1.0.0"
 TUS_MAX_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB
+
+
+def _check_tus_version(request: Request) -> None:
+    version = request.headers.get("Tus-Resumable")
+    if version != TUS_VERSION:
+        raise HTTPException(
+            status_code=412,
+            detail=f"Unsupported tus version: {version!r}",
+        )
 
 
 @router.options("")
@@ -27,13 +36,19 @@ async def tus_options() -> Response:
 @router.post("")
 async def tus_create(
     request: Request,
-    storage: LocalStorageBackend = Depends(get_storage),
+    storage: StorageBackend = Depends(get_storage),
 ) -> Response:
+    _check_tus_version(request)
+
     upload_length = request.headers.get("Upload-Length")
     if not upload_length:
         raise HTTPException(status_code=400, detail="Upload-Length header required")
 
-    total_size = int(upload_length)
+    try:
+        total_size = int(upload_length)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Upload-Length must be an integer")
+
     if total_size > TUS_MAX_SIZE:
         raise HTTPException(status_code=413, detail="File too large")
 
@@ -60,8 +75,11 @@ async def tus_create(
 @router.head("/{upload_id}")
 async def tus_head(
     upload_id: str,
-    storage: LocalStorageBackend = Depends(get_storage),
+    request: Request,
+    storage: StorageBackend = Depends(get_storage),
 ) -> Response:
+    _check_tus_version(request)
+
     try:
         meta = storage.get_upload_meta(upload_id)
     except FileNotFoundError:
@@ -82,8 +100,10 @@ async def tus_head(
 async def tus_patch(
     upload_id: str,
     request: Request,
-    storage: LocalStorageBackend = Depends(get_storage),
+    storage: StorageBackend = Depends(get_storage),
 ) -> Response:
+    _check_tus_version(request)
+
     if request.headers.get("Content-Type") != "application/offset+octet-stream":
         raise HTTPException(
             status_code=415,
@@ -94,7 +114,10 @@ async def tus_patch(
     if upload_offset is None:
         raise HTTPException(status_code=400, detail="Upload-Offset header required")
 
-    offset = int(upload_offset)
+    try:
+        offset = int(upload_offset)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Upload-Offset must be an integer")
 
     try:
         meta = storage.get_upload_meta(upload_id)
@@ -116,7 +139,10 @@ async def tus_patch(
     }
 
     if new_offset == meta["total_size"]:
-        storage.finalize_upload(upload_id)
+        try:
+            storage.finalize_upload(upload_id)
+        except (ValueError, FileNotFoundError):
+            raise HTTPException(status_code=409, detail="Upload already finalized or incomplete")
         headers["X-Video-Id"] = upload_id
 
     return Response(status_code=204, headers=headers)

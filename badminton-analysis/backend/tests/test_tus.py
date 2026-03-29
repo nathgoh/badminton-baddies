@@ -65,14 +65,14 @@ def test_head_returns_current_offset(client):
     )
     upload_id = post.headers["location"].split("/")[-1]
 
-    head = client.head(f"/api/tus/{upload_id}")
+    head = client.head(f"/api/tus/{upload_id}", headers={"Tus-Resumable": "1.0.0"})
     assert head.status_code == 200
     assert head.headers["upload-offset"] == "0"
     assert head.headers["upload-length"] == "100"
 
 
 def test_head_unknown_upload_returns_404(client):
-    assert client.head("/api/tus/nonexistent").status_code == 404
+    assert client.head("/api/tus/nonexistent", headers={"Tus-Resumable": "1.0.0"}).status_code == 404
 
 
 def test_patch_uploads_chunk_and_returns_new_offset(client):
@@ -172,6 +172,18 @@ def test_patch_offset_mismatch_returns_409(client):
     assert patch.status_code == 409
 
 
+def test_post_file_too_large_returns_413(client):
+    response = client.post(
+        "/api/tus",
+        headers={
+            "Tus-Resumable": "1.0.0",
+            "Upload-Length": str(10 * 1024 * 1024 * 1024 + 1),  # 10GB + 1 byte
+            "Upload-Metadata": _filename_meta("huge.mp4"),
+        },
+    )
+    assert response.status_code == 413
+
+
 def test_resumption_via_head_then_patch(client):
     data = b"hello world"
     post = client.post(
@@ -196,7 +208,7 @@ def test_resumption_via_head_then_patch(client):
     )
 
     # Check offset
-    head = client.head(f"/api/tus/{upload_id}")
+    head = client.head(f"/api/tus/{upload_id}", headers={"Tus-Resumable": "1.0.0"})
     assert head.headers["upload-offset"] == "5"
 
     # Resume from offset 5

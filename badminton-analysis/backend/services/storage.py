@@ -57,7 +57,9 @@ class LocalStorageBackend:
         meta_path = upload_dir / "meta.json"
         meta = json.loads(meta_path.read_text())
         meta["offset"] = new_offset
-        meta_path.write_text(json.dumps(meta))
+        tmp_path = meta_path.with_suffix(".tmp")
+        tmp_path.write_text(json.dumps(meta))
+        os.replace(tmp_path, meta_path)  # atomic on POSIX
         return new_offset
 
     def finalize_upload(self, upload_id: str) -> None:
