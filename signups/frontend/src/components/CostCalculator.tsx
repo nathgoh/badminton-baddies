@@ -9,7 +9,7 @@ interface Props {
   onRefresh: () => void
 }
 
-const EMPTY_COURT = { name: '', start_time: '', end_time: '', max_players: '6', total_cost: '' }
+const EMPTY_COURT = { name: '', start_time: '19:00', end_time: '22:00', max_players: '6', total_cost: '' }
 
 interface CourtEdit {
   start_time: string
@@ -160,7 +160,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
               style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', background: '#f8f9ff' }}
             >
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{court.name}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
                 <input
                   required
                   type="time"
@@ -175,10 +175,13 @@ export default function CostCalculator({ data, onRefresh }: Props) {
                   onChange={(e) => setEditValues((v) => v && ({ ...v, end_time: e.target.value }))}
                   style={{ padding: 5, border: '1px solid #c5cae9', borderRadius: 4, fontSize: 12 }}
                 />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
                 <input
                   required
                   type="number"
                   min="1"
+                  placeholder="Max players"
                   value={editValues.max_players}
                   onChange={(e) => setEditValues((v) => v && ({ ...v, max_players: e.target.value }))}
                   style={{ padding: 5, border: '1px solid #c5cae9', borderRadius: 4, fontSize: 12 }}
@@ -187,6 +190,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
                   required
                   type="number"
                   step="0.01"
+                  placeholder="Cost $"
                   value={editValues.total_cost}
                   onChange={(e) => setEditValues((v) => v && ({ ...v, total_cost: e.target.value }))}
                   style={{ padding: 5, border: '1px solid #c5cae9', borderRadius: 4, fontSize: 12 }}

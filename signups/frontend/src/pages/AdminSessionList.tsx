@@ -25,7 +25,7 @@ export default function AdminSessionList() {
   const [cancelWindow, setCancelWindow] = useState('48')
   const [isNarrow, setIsNarrow] = useState(() => window.innerWidth < 900)
   const [courts, setCourts] = useState<NewCourtForm[]>([
-    { name: '', start_time: '', end_time: '', max_players: '6', total_cost: '' },
+    { name: '', start_time: '19:00', end_time: '22:00', max_players: '6', total_cost: '' },
   ])
   const [error, setError] = useState<string | null>(null)
   const { logout, email } = useAdminAuth()
@@ -74,7 +74,7 @@ export default function AdminSessionList() {
       setSessionName('')
       setSessionDate('')
       setCancelWindow('48')
-      setCourts([{ name: '', start_time: '', end_time: '', max_players: '6', total_cost: '' }])
+      setCourts([{ name: '', start_time: '19:00', end_time: '22:00', max_players: '6', total_cost: '' }])
       await load()
     } catch (caughtError) {
       setError(errorMessage(caughtError))
@@ -312,7 +312,7 @@ export default function AdminSessionList() {
             onClick={() =>
               setCourts((current) => [
                 ...current,
-                { name: '', start_time: '', end_time: '', max_players: '6', total_cost: '' },
+                { name: '', start_time: '19:00', end_time: '22:00', max_players: '6', total_cost: '' },
               ])
             }
             style={{
