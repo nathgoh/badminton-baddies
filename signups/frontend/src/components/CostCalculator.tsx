@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { calculateCosts, regenerateToken, updateSession } from '../api/client'
+import { calculateCosts, createCourt, regenerateToken, updateSession } from '../api/client'
 import { formatTime } from '../utils'
 import type { AdminSessionResponse } from '../types'
 
@@ -9,10 +9,15 @@ interface Props {
   onRefresh: () => void
 }
 
+const EMPTY_COURT = { name: '', start_time: '', end_time: '', max_players: '', total_cost: '' }
+
 export default function CostCalculator({ data, onRefresh }: Props) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ base_amount: number } | null>(null)
   const [copying, setCopying] = useState(false)
+  const [showAddCourt, setShowAddCourt] = useState(false)
+  const [newCourt, setNewCourt] = useState(EMPTY_COURT)
+  const [addingCourt, setAddingCourt] = useState(false)
 
   const publicUrl = `${window.location.origin}/s/${data.session.access_token}`
 
@@ -40,6 +45,25 @@ export default function CostCalculator({ data, onRefresh }: Props) {
     }
     await regenerateToken(data.session.id)
     onRefresh()
+  }
+
+  async function handleAddCourt(event: React.FormEvent) {
+    event.preventDefault()
+    setAddingCourt(true)
+    try {
+      await createCourt(data.session.id, {
+        name: newCourt.name,
+        start_time: newCourt.start_time,
+        end_time: newCourt.end_time,
+        max_players: parseInt(newCourt.max_players, 10),
+        total_cost: parseFloat(newCourt.total_cost),
+      })
+      setNewCourt(EMPTY_COURT)
+      setShowAddCourt(false)
+      onRefresh()
+    } finally {
+      setAddingCourt(false)
+    }
   }
 
   async function handleCopy() {
@@ -108,6 +132,107 @@ export default function CostCalculator({ data, onRefresh }: Props) {
           </div>
         ))}
       </div>
+
+      {showAddCourt ? (
+        <form
+          onSubmit={handleAddCourt}
+          style={{
+            border: '1px solid #c5cae9',
+            borderRadius: 6,
+            padding: 12,
+            marginBottom: 16,
+            background: '#f8f9ff',
+          }}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+            <input
+              required
+              placeholder="Court name"
+              value={newCourt.name}
+              onChange={(e) => setNewCourt((c) => ({ ...c, name: e.target.value }))}
+              style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+            />
+            <input
+              required
+              type="time"
+              value={newCourt.start_time}
+              onChange={(e) => setNewCourt((c) => ({ ...c, start_time: e.target.value }))}
+              style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+            />
+            <input
+              required
+              type="time"
+              value={newCourt.end_time}
+              onChange={(e) => setNewCourt((c) => ({ ...c, end_time: e.target.value }))}
+              style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+            <input
+              required
+              type="number"
+              placeholder="Max players"
+              value={newCourt.max_players}
+              onChange={(e) => setNewCourt((c) => ({ ...c, max_players: e.target.value }))}
+              style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+            />
+            <input
+              required
+              type="number"
+              placeholder="Cost $"
+              value={newCourt.total_cost}
+              onChange={(e) => setNewCourt((c) => ({ ...c, total_cost: e.target.value }))}
+              style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="submit"
+              disabled={addingCourt}
+              style={{
+                padding: '5px 12px',
+                background: '#3f51b5',
+                color: 'white',
+                border: 'none',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 12,
+              }}
+            >
+              {addingCourt ? 'Adding...' : 'Add'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowAddCourt(false); setNewCourt(EMPTY_COURT) }}
+              style={{
+                padding: '5px 12px',
+                background: 'white',
+                border: '1px solid #ccc',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 12,
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button
+          onClick={() => setShowAddCourt(true)}
+          style={{
+            fontSize: 12,
+            padding: '4px 10px',
+            background: 'white',
+            border: '1px solid #ccc',
+            borderRadius: 4,
+            cursor: 'pointer',
+            marginBottom: 16,
+          }}
+        >
+          + Add court
+        </button>
+      )}
 
       <div
         style={{

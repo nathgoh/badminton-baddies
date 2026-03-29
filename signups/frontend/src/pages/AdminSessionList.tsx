@@ -51,6 +51,10 @@ export default function AdminSessionList() {
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
+    if (!courts.some((c) => c.name)) {
+      setError('At least one court is required.')
+      return
+    }
     try {
       const session = await createSession({
         name: sessionName,
