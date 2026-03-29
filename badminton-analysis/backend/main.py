@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import upload, video, detect, analyze
+from routers import upload, video, detect, analyze, tus
 
 app = FastAPI(title="Badminton Analysis API")
 
@@ -14,6 +14,7 @@ app.add_middleware(
 )
 
 app.include_router(upload.router)
+app.include_router(tus.router)
 app.include_router(video.router)
 app.include_router(detect.router)
 app.include_router(analyze.router)
