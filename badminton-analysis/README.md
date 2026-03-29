@@ -18,6 +18,7 @@ A web application for analyzing badminton player performance from video using AI
 ## Tech Stack
 
 ### Backend
+
 - **FastAPI** (Python) - REST API framework
 - **OpenCV** - Video processing
 - **Ultralytics YOLOv8** - Person detection
@@ -25,6 +26,7 @@ A web application for analyzing badminton player performance from video using AI
 - **NumPy** - Numerical computations
 
 ### Frontend
+
 - **React 18** with TypeScript
 - **Vite** - Build tool and dev server
 - **Tailwind CSS** - Styling
@@ -35,6 +37,7 @@ A web application for analyzing badminton player performance from video using AI
 ## Quick Start
 
 ### Prerequisites
+
 - Python 3.10+
 - Node.js 20+
 - UV package manager (recommended)

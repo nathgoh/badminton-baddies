@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { apiClient } from '../api/client';
-import { AnalysisResult, AnalysisStats } from '../types';
+import { AnalysisResult } from '../types';
 
 interface StatCardProps {
   title: string;
