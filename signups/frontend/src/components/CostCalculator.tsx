@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { calculateCosts, createCourt, regenerateToken, updateSession } from '../api/client'
+import { calculateCosts, createCourt, deleteCourt, regenerateToken, updateCourt, updateSession } from '../api/client'
 import { formatTime } from '../utils'
 import type { AdminSessionResponse } from '../types'
 
@@ -11,6 +11,13 @@ interface Props {
 
 const EMPTY_COURT = { name: '', start_time: '', end_time: '', max_players: '6', total_cost: '' }
 
+interface CourtEdit {
+  start_time: string
+  end_time: string
+  max_players: string
+  total_cost: string
+}
+
 export default function CostCalculator({ data, onRefresh }: Props) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ base_amount: number } | null>(null)
@@ -18,6 +25,8 @@ export default function CostCalculator({ data, onRefresh }: Props) {
   const [showAddCourt, setShowAddCourt] = useState(false)
   const [newCourt, setNewCourt] = useState(EMPTY_COURT)
   const [addingCourt, setAddingCourt] = useState(false)
+  const [editingCourtId, setEditingCourtId] = useState<string | null>(null)
+  const [editValues, setEditValues] = useState<CourtEdit | null>(null)
 
   const publicUrl = `${window.location.origin}/s/${data.session.access_token}`
 
@@ -44,6 +53,38 @@ export default function CostCalculator({ data, onRefresh }: Props) {
       return
     }
     await regenerateToken(data.session.id)
+    onRefresh()
+  }
+
+  function startEditCourt(courtId: string) {
+    const court = data.courts.find((c) => c.id === courtId)
+    if (!court) return
+    setEditingCourtId(courtId)
+    setEditValues({
+      start_time: court.start_time,
+      end_time: court.end_time,
+      max_players: String(court.max_players),
+      total_cost: String(court.total_cost),
+    })
+  }
+
+  async function handleSaveCourt(event: React.FormEvent) {
+    event.preventDefault()
+    if (!editingCourtId || !editValues) return
+    await updateCourt(editingCourtId, {
+      start_time: editValues.start_time,
+      end_time: editValues.end_time,
+      max_players: parseInt(editValues.max_players, 10),
+      total_cost: parseFloat(editValues.total_cost),
+    })
+    setEditingCourtId(null)
+    setEditValues(null)
+    onRefresh()
+  }
+
+  async function handleDeleteCourt(courtId: string) {
+    if (!window.confirm('Remove this court?')) return
+    await deleteCourt(courtId)
     onRefresh()
   }
 
@@ -111,26 +152,96 @@ export default function CostCalculator({ data, onRefresh }: Props) {
           marginBottom: 16,
         }}
       >
-        {data.courts.map((court) => (
-          <div
-            key={court.id}
-            style={{
-              padding: '12px 14px',
-              borderBottom: '1px solid #f0f0f0',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{court.name}</div>
-              <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-                {formatTime(court.start_time)} - {formatTime(court.end_time)} · max {court.max_players} · $
-                {court.total_cost}
+        {data.courts.map((court) =>
+          editingCourtId === court.id && editValues ? (
+            <form
+              key={court.id}
+              onSubmit={handleSaveCourt}
+              style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', background: '#f8f9ff' }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{court.name}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                <input
+                  required
+                  type="time"
+                  value={editValues.start_time}
+                  onChange={(e) => setEditValues((v) => v && ({ ...v, start_time: e.target.value }))}
+                  style={{ padding: 5, border: '1px solid #c5cae9', borderRadius: 4, fontSize: 12 }}
+                />
+                <input
+                  required
+                  type="time"
+                  value={editValues.end_time}
+                  onChange={(e) => setEditValues((v) => v && ({ ...v, end_time: e.target.value }))}
+                  style={{ padding: 5, border: '1px solid #c5cae9', borderRadius: 4, fontSize: 12 }}
+                />
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  value={editValues.max_players}
+                  onChange={(e) => setEditValues((v) => v && ({ ...v, max_players: e.target.value }))}
+                  style={{ padding: 5, border: '1px solid #c5cae9', borderRadius: 4, fontSize: 12 }}
+                />
+                <input
+                  required
+                  type="number"
+                  step="0.01"
+                  value={editValues.total_cost}
+                  onChange={(e) => setEditValues((v) => v && ({ ...v, total_cost: e.target.value }))}
+                  style={{ padding: 5, border: '1px solid #c5cae9', borderRadius: 4, fontSize: 12 }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  type="submit"
+                  style={{ fontSize: 11, padding: '3px 10px', background: '#3f51b5', color: 'white', border: 'none', borderRadius: 3, cursor: 'pointer' }}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditingCourtId(null); setEditValues(null) }}
+                  style={{ fontSize: 11, padding: '3px 10px', background: 'white', border: '1px solid #ccc', borderRadius: 3, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div
+              key={court.id}
+              style={{
+                padding: '12px 14px',
+                borderBottom: '1px solid #f0f0f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{court.name}</div>
+                <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
+                  {formatTime(court.start_time)} - {formatTime(court.end_time)} · max {court.max_players} · ${court.total_cost}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={() => startEditCourt(court.id)}
+                  style={{ fontSize: 11, padding: '3px 8px', background: 'white', border: '1px solid #e0e0e0', borderRadius: 3, cursor: 'pointer', color: '#555' }}
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => void handleDeleteCourt(court.id)}
+                  style={{ fontSize: 11, padding: '3px 8px', background: 'white', border: '1px solid #ffcdd2', borderRadius: 3, cursor: 'pointer', color: '#c62828' }}
+                >
+                  x
+                </button>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        )}
       </div>
 
       {showAddCourt ? (

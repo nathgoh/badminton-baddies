@@ -126,6 +126,16 @@ export async function createCourt(
   })
 }
 
+export async function updateCourt(
+  courtId: string,
+  data: { start_time?: string; end_time?: string; max_players?: number; total_cost?: number },
+): Promise<Court> {
+  return request(`/api/courts/${courtId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
 export async function deleteCourt(courtId: string): Promise<void> {
   return request(`/api/courts/${courtId}`, { method: 'DELETE' })
 }
