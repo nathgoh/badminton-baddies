@@ -197,6 +197,26 @@ class SheetsAdapter(StorageAdapter):
         return updated
 
     def delete_session(self, id: str) -> None:
+        # Delete associated signups (bottom-to-top to keep row indices stable)
+        signup_rows = self._ws("signups").get_all_values()
+        signup_indices = sorted(
+            [i for i, row in enumerate(signup_rows[1:], start=2) if row and row[1] == id],
+            reverse=True,
+        )
+        for row_index in signup_indices:
+            self._ws("signups").delete_rows(row_index)
+        self._invalidate("signups")
+
+        # Delete associated courts (bottom-to-top)
+        court_rows = self._ws("courts").get_all_values()
+        court_indices = sorted(
+            [i for i, row in enumerate(court_rows[1:], start=2) if row and row[1] == id],
+            reverse=True,
+        )
+        for row_index in court_indices:
+            self._ws("courts").delete_rows(row_index)
+        self._invalidate("courts")
+
         self._ws("sessions").delete_rows(self._find_row_index("sessions", id))
         self._invalidate("sessions")
 
