@@ -63,6 +63,10 @@ class LocalStorageBackend:
     def finalize_upload(self, upload_id: str) -> None:
         upload_dir = self._uploads_dir() / upload_id
         meta = json.loads((upload_dir / "meta.json").read_text())
+        if meta["offset"] != meta["total_size"]:
+            raise ValueError(
+                f"Upload incomplete: {meta['offset']}/{meta['total_size']} bytes written"
+            )
         video_dir = self.get_video_dir(upload_id)
         shutil.move(str(upload_dir / "data"), str(video_dir / meta["filename"]))
         shutil.rmtree(upload_dir)
@@ -81,7 +85,7 @@ class LocalStorageBackend:
         return p
 
 
-def get_storage() -> LocalStorageBackend:
+def get_storage() -> StorageBackend:
     return LocalStorageBackend()
 
 
@@ -89,13 +93,16 @@ def get_storage() -> LocalStorageBackend:
 # Backwards-compat shims — routers still use these until Task 3 migrates them
 # ---------------------------------------------------------------------------
 
+_default_storage = LocalStorageBackend()
+
+
 def get_video_dir(video_id: str) -> Path:
-    return get_storage().get_video_dir(video_id)
+    return _default_storage.get_video_dir(video_id)
 
 
 def get_video_path(video_id: str, filename: str) -> Path:
-    return get_storage().get_video_path(video_id, filename)
+    return _default_storage.get_video_path(video_id, filename)
 
 
 def get_analysis_dir(analysis_id: str) -> Path:
-    return get_storage().get_analysis_dir(analysis_id)
+    return _default_storage.get_analysis_dir(analysis_id)

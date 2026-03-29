@@ -65,3 +65,17 @@ def test_get_analysis_dir_creates_directory(storage):
     path = storage.get_analysis_dir("xyz")
     assert path.exists()
     assert path.is_dir()
+
+
+def test_finalize_raises_when_upload_incomplete(storage):
+    storage.create_upload("abc", 100, "video.mp4")
+    storage.write_chunk("abc", 0, b"partial")
+    with pytest.raises(ValueError, match="incomplete"):
+        storage.finalize_upload("abc")
+
+
+def test_create_upload_zero_size(storage):
+    storage.create_upload("abc", 0, "empty.mp4")
+    meta = storage.get_upload_meta("abc")
+    assert meta["total_size"] == 0
+    assert meta["offset"] == 0
