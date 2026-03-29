@@ -57,6 +57,7 @@ SIGNUP_COLS = [
     "amount_owed",
     "amount_adjusted",
     "cancelled_at",
+    "paid",
 ]
 PLAYER_COLS = ["email", "name", "venmo_or_phone", "first_seen", "last_seen"]
 ADMIN_COLS = ["email", "added_at"]
@@ -246,6 +247,7 @@ class SheetsAdapter(StorageAdapter):
             amount_owed=_parse_optional_float(row["amount_owed"]),
             amount_adjusted=_parse_bool(row["amount_adjusted"]),
             cancelled_at=_parse_optional_datetime(row["cancelled_at"]),
+            paid=_parse_bool(row.get("paid", "")),
         )
 
     def get_signups(self, session_id: str) -> list[Signup]:
@@ -278,6 +280,7 @@ class SheetsAdapter(StorageAdapter):
                 "amount_owed": signup.amount_owed or "",
                 "amount_adjusted": signup.amount_adjusted,
                 "cancelled_at": "",
+                "paid": signup.paid,
             },
         )
         return signup
@@ -303,6 +306,7 @@ class SheetsAdapter(StorageAdapter):
                 "amount_owed": updated.amount_owed if updated.amount_owed is not None else "",
                 "amount_adjusted": updated.amount_adjusted,
                 "cancelled_at": updated.cancelled_at.isoformat() if updated.cancelled_at else "",
+                "paid": updated.paid,
             },
         )
         return updated

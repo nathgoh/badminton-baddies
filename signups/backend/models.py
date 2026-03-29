@@ -74,6 +74,7 @@ class Signup(BaseModel):
     amount_owed: Optional[float] = None
     amount_adjusted: bool = False
     cancelled_at: Optional[datetime] = None
+    paid: bool = False
 
 
 class SignupCreate(BaseModel):
@@ -88,6 +89,7 @@ class SignupUpdate(BaseModel):
     amount_owed: Optional[float] = None
     amount_adjusted: Optional[bool] = None
     cancelled_at: Optional[datetime] = None
+    paid: Optional[bool] = None
 
 
 class Player(BaseModel):

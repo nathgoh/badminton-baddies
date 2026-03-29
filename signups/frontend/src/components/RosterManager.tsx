@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { adminCancelSignup, promoteFromWaitlist, updateSignupAmount } from '../api/client'
+import { adminCancelSignup, markSignupPaid, promoteFromWaitlist, updateSignupAmount } from '../api/client'
 import type { Signup } from '../types'
 
 interface Props {
@@ -22,6 +22,11 @@ export default function RosterManager({ signups, onRefresh }: Props) {
 
   async function handlePromote(signupId: string) {
     await promoteFromWaitlist(signupId)
+    onRefresh()
+  }
+
+  async function handleTogglePaid(signupId: string, currentPaid: boolean) {
+    await markSignupPaid(signupId, !currentPaid)
     onRefresh()
   }
 
@@ -60,7 +65,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
             background: '#f5f5f5',
             padding: '8px 14px',
             display: 'grid',
-            gridTemplateColumns: '1fr 80px 70px 90px',
+            gridTemplateColumns: '1fr 80px 70px 60px 90px',
             gap: 8,
             fontSize: 11,
             fontWeight: 600,
@@ -71,6 +76,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
           <span>Player</span>
           <span>Status</span>
           <span>Owes</span>
+          <span>Paid</span>
           <span></span>
         </div>
         {confirmed.map((signup) => (
@@ -79,7 +85,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
             style={{
               padding: '10px 14px',
               display: 'grid',
-              gridTemplateColumns: '1fr 80px 70px 90px',
+              gridTemplateColumns: '1fr 80px 70px 60px 90px',
               gap: 8,
               alignItems: 'center',
               borderBottom: '1px solid #f5f5f5',
@@ -125,6 +131,23 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                   {signup.amount_adjusted ? ' ✎' : ''}
                 </span>
               )}
+            </div>
+            <div>
+              <button
+                onClick={() => void handleTogglePaid(signup.id, signup.paid)}
+                style={{
+                  fontSize: 11,
+                  padding: '2px 6px',
+                  background: signup.paid ? '#e8f5e9' : 'white',
+                  color: signup.paid ? '#2e7d32' : '#999',
+                  border: `1px solid ${signup.paid ? '#a5d6a7' : '#ddd'}`,
+                  borderRadius: 3,
+                  cursor: 'pointer',
+                  fontWeight: signup.paid ? 600 : 400,
+                }}
+              >
+                {signup.paid ? 'Paid ✓' : 'Mark paid'}
+              </button>
             </div>
             <div style={{ display: 'flex', gap: 4 }}>
               {editingId === signup.id ? (

@@ -31,6 +31,7 @@ export interface Signup {
   amount_owed: number | null
   amount_adjusted: boolean
   cancelled_at: string | null
+  paid: boolean
 }
 
 export interface Player {

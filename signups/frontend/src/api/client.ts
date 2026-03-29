@@ -154,6 +154,13 @@ export async function promoteFromWaitlist(signupId: string): Promise<Signup> {
   return request(`/api/admin/signups/${signupId}/promote`, { method: 'POST' })
 }
 
+export async function markSignupPaid(signupId: string, paid: boolean): Promise<Signup> {
+  return request(`/api/admin/signups/${signupId}/mark-paid`, {
+    method: 'POST',
+    body: JSON.stringify({ paid }),
+  })
+}
+
 export async function adminCancelSignup(signupId: string): Promise<Signup> {
   return request(`/api/admin/signups/${signupId}`, { method: 'DELETE' })
 }

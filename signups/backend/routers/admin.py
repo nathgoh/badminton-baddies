@@ -125,6 +125,20 @@ def update_signup_amount(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signup not found") from exc
 
 
+class MarkPaidRequest(BaseModel):
+    paid: bool
+
+
+@router.post("/signups/{signup_id}/mark-paid", response_model=Signup)
+def mark_paid(
+    signup_id: str, body: MarkPaidRequest, storage: StorageAdapter = Depends(get_storage)
+) -> Signup:
+    try:
+        return storage.update_signup(signup_id, SignupUpdate(paid=body.paid))
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signup not found") from exc
+
+
 @router.post("/signups/{signup_id}/promote", response_model=Signup)
 def promote_from_waitlist(signup_id: str, storage: StorageAdapter = Depends(get_storage)) -> Signup:
     try:
