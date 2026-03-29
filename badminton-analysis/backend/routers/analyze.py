@@ -1,6 +1,10 @@
+import atexit
+import logging
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -21,6 +25,7 @@ router = APIRouter(prefix="/api")
 _analysis_status = {}
 _status_lock = Lock()
 _executor = ThreadPoolExecutor(max_workers=2)
+atexit.register(_executor.shutdown, wait=False)
 
 
 class AnalysisJob(BaseModel):
@@ -172,7 +177,8 @@ def _run_analysis(analysis_id: str, request: AnalyzeRequest, storage: StorageBac
                 job.progress = 1.0
                 job.result = result
 
-    except Exception as e:
+    except Exception:
+        logger.exception("Analysis %s failed", analysis_id)
         with _status_lock:
             job = _analysis_status.get(analysis_id)
             if job:

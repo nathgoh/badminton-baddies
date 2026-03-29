@@ -31,3 +31,13 @@ def test_serve_video(client, storage):
 def test_serve_video_not_found(client):
     response = client.get("/api/video/nonexistent/nope.mp4")
     assert response.status_code == 404
+
+
+def test_serve_analysis_video(client, storage):
+    analysis_id = "test-analysis-id"
+    analysis_dir = storage.get_analysis_dir(analysis_id)
+    (analysis_dir / "annotated_video.mp4").write_bytes(b"annotated video bytes")
+
+    response = client.get(f"/api/video/analyses/{analysis_id}/annotated_video.mp4")
+    assert response.status_code == 200
+    assert response.content == b"annotated video bytes"
