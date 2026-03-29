@@ -25,7 +25,7 @@ export default function AdminSessionList() {
   const [cancelWindow, setCancelWindow] = useState('48')
   const [isNarrow, setIsNarrow] = useState(() => window.innerWidth < 900)
   const [courts, setCourts] = useState<NewCourtForm[]>([
-    { name: '', start_time: '', end_time: '', max_players: '', total_cost: '' },
+    { name: '', start_time: '', end_time: '', max_players: '6', total_cost: '' },
   ])
   const [error, setError] = useState<string | null>(null)
   const { logout, email } = useAdminAuth()
@@ -74,7 +74,7 @@ export default function AdminSessionList() {
       setSessionName('')
       setSessionDate('')
       setCancelWindow('48')
-      setCourts([{ name: '', start_time: '', end_time: '', max_players: '', total_cost: '' }])
+      setCourts([{ name: '', start_time: '', end_time: '', max_players: '6', total_cost: '' }])
       await load()
     } catch (caughtError) {
       setError(errorMessage(caughtError))
@@ -270,6 +270,7 @@ export default function AdminSessionList() {
               <input
                 placeholder="Max players"
                 type="number"
+                min="1"
                 value={court.max_players}
                 onChange={(event) => updateCourt(index, 'max_players', event.target.value)}
                 style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
@@ -311,7 +312,7 @@ export default function AdminSessionList() {
             onClick={() =>
               setCourts((current) => [
                 ...current,
-                { name: '', start_time: '', end_time: '', max_players: '', total_cost: '' },
+                { name: '', start_time: '', end_time: '', max_players: '6', total_cost: '' },
               ])
             }
             style={{

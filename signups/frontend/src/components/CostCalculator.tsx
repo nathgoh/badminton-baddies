@@ -9,7 +9,7 @@ interface Props {
   onRefresh: () => void
 }
 
-const EMPTY_COURT = { name: '', start_time: '', end_time: '', max_players: '', total_cost: '' }
+const EMPTY_COURT = { name: '', start_time: '', end_time: '', max_players: '6', total_cost: '' }
 
 export default function CostCalculator({ data, onRefresh }: Props) {
   const [loading, setLoading] = useState(false)
@@ -171,6 +171,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
             <input
               required
               type="number"
+              min="1"
               placeholder="Max players"
               value={newCourt.max_players}
               onChange={(e) => setNewCourt((c) => ({ ...c, max_players: e.target.value }))}
