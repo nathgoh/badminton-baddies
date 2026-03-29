@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { createCourt, createSession, listSessions } from '../api/client'
+import { createCourt, createSession, deleteSession, listSessions } from '../api/client'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import type { Session } from '../types'
 
@@ -79,6 +79,12 @@ export default function AdminSessionList() {
     } catch (caughtError) {
       setError(errorMessage(caughtError))
     }
+  }
+
+  async function handleDelete(session: Session) {
+    if (!confirm(`Delete "${session.name}"? This cannot be undone.`)) return
+    await deleteSession(session.id)
+    await load()
   }
 
   function updateCourt(index: number, field: keyof NewCourtForm, value: string) {
@@ -389,6 +395,20 @@ export default function AdminSessionList() {
                 }}
               >
                 Manage
+              </button>
+              <button
+                onClick={() => void handleDelete(session)}
+                style={{
+                  padding: '6px 12px',
+                  background: 'white',
+                  border: '1px solid #ffcdd2',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  color: '#c62828',
+                }}
+              >
+                Delete
               </button>
             </div>
           </div>
