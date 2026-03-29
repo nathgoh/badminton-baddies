@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { calculateCosts, regenerateToken, updateSession } from '../api/client'
+import { formatTime } from '../utils'
 import type { AdminSessionResponse } from '../types'
 
 interface Props {
@@ -100,7 +101,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
             <div>
               <div style={{ fontWeight: 600, fontSize: 14 }}>{court.name}</div>
               <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-                {court.start_time} - {court.end_time} · max {court.max_players} · $
+                {formatTime(court.start_time)} - {formatTime(court.end_time)} · max {court.max_players} · $
                 {court.total_cost}
               </div>
             </div>

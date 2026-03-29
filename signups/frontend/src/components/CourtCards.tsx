@@ -1,4 +1,5 @@
 import type { Court } from '../types'
+import { formatTime } from '../utils'
 
 interface Props {
   courts: Court[]
@@ -36,7 +37,7 @@ export default function CourtCards({
           >
             <div style={{ fontWeight: 600 }}>{court.name}</div>
             <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-              {court.start_time} - {court.end_time}
+              {formatTime(court.start_time)} - {formatTime(court.end_time)}
             </div>
             <div
               style={{
