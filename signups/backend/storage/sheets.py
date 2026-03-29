@@ -1,4 +1,5 @@
 import secrets
+import time
 import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
@@ -83,26 +84,49 @@ def _parse_optional_datetime(value) -> Optional[datetime]:
 
 
 class SheetsAdapter(StorageAdapter):
+    _CACHE_TTL = 30.0
+
     def __init__(self, spreadsheet_id: str, credentials_file: str):
         creds = Credentials.from_service_account_file(credentials_file, scopes=SCOPES)
         gc = gspread.authorize(creds)
         self._ss = gc.open_by_key(spreadsheet_id)
+        self._cache: dict = {}
 
     def _ws(self, name: str):
         return self._ss.worksheet(name)
 
+    def _cache_get(self, sheet_name: str) -> Optional[list]:
+        entry = self._cache.get(sheet_name)
+        if entry is None:
+            return None
+        rows, ts = entry
+        if time.monotonic() - ts > self._CACHE_TTL:
+            return None
+        return rows
+
+    def _cache_set(self, sheet_name: str, rows: list) -> None:
+        self._cache[sheet_name] = (rows, time.monotonic())
+
+    def _invalidate(self, sheet_name: str) -> None:
+        self._cache.pop(sheet_name, None)
+
     def _all_rows(self, sheet_name: str, cols: list[str]) -> list[dict[str, str]]:
+        cached = self._cache_get(sheet_name)
+        if cached is not None:
+            return cached
         rows = self._ws(sheet_name).get_all_values()
-        if len(rows) <= 1:
-            return []
-        return [_row_to_dict(cols, row) for row in rows[1:] if any(row)]
+        result = [] if len(rows) <= 1 else [_row_to_dict(cols, row) for row in rows[1:] if any(row)]
+        self._cache_set(sheet_name, result)
+        return result
 
     def _append(self, sheet_name: str, cols: list[str], data: dict) -> None:
         self._ws(sheet_name).append_row([str(data.get(col, "")) for col in cols])
+        self._invalidate(sheet_name)
 
     def _update_row(self, sheet_name: str, cols: list[str], row_index: int, data: dict) -> None:
         values = [str(data.get(col, "")) for col in cols]
         self._ws(sheet_name).update(f"A{row_index}", [values])
+        self._invalidate(sheet_name)
 
     def _find_row_index(self, sheet_name: str, id_val: str) -> int:
         rows = self._ws(sheet_name).get_all_values()
@@ -174,6 +198,7 @@ class SheetsAdapter(StorageAdapter):
 
     def delete_session(self, id: str) -> None:
         self._ws("sessions").delete_rows(self._find_row_index("sessions", id))
+        self._invalidate("sessions")
 
     def _row_to_court(self, row: dict[str, str]) -> Court:
         return Court(
@@ -234,6 +259,7 @@ class SheetsAdapter(StorageAdapter):
 
     def delete_court(self, id: str) -> None:
         self._ws("courts").delete_rows(self._find_row_index("courts", id))
+        self._invalidate("courts")
 
     def _row_to_signup(self, row: dict[str, str]) -> Signup:
         return Signup(
