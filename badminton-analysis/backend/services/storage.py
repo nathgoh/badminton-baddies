@@ -40,7 +40,9 @@ class LocalStorageBackend:
             "total_size": total_size,
             "offset": 0,
         }
-        (upload_dir / "meta.json").write_text(json.dumps(meta))
+        meta_tmp = upload_dir / "meta.json.tmp"
+        meta_tmp.write_text(json.dumps(meta))
+        os.replace(meta_tmp, upload_dir / "meta.json")
 
     def get_upload_meta(self, upload_id: str) -> dict:
         meta_path = self._uploads_dir() / upload_id / "meta.json"

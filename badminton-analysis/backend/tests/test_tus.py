@@ -184,6 +184,41 @@ def test_post_file_too_large_returns_413(client):
     assert response.status_code == 413
 
 
+def test_patch_missing_tus_resumable_returns_412(client):
+    post = client.post(
+        "/api/tus",
+        headers={
+            "Tus-Resumable": "1.0.0",
+            "Upload-Length": "10",
+            "Upload-Metadata": _filename_meta("game.mp4"),
+        },
+    )
+    upload_id = post.headers["location"].split("/")[-1]
+
+    patch = client.patch(
+        f"/api/tus/{upload_id}",
+        content=b"data",
+        headers={
+            "Content-Type": "application/offset+octet-stream",
+            "Upload-Offset": "0",
+            # No Tus-Resumable header
+        },
+    )
+    assert patch.status_code == 412
+
+
+def test_post_wrong_tus_resumable_returns_412(client):
+    response = client.post(
+        "/api/tus",
+        headers={
+            "Tus-Resumable": "2.0.0",
+            "Upload-Length": "100",
+            "Upload-Metadata": _filename_meta("game.mp4"),
+        },
+    )
+    assert response.status_code == 412
+
+
 def test_resumption_via_head_then_patch(client):
     data = b"hello world"
     post = client.post(
