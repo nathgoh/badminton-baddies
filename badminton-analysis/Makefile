@@ -1,49 +1,43 @@
-.PHONY: help venv install dev-install clean test lint format frontend frontend-dev frontend-dev-backend run
+.PHONY: help install install-backend clean test lint format frontend frontend-dev frontend-build run
 
 # Default target
 help:
 	@echo "Available commands:"
-	@echo "  venv         - Create UV virtual environment"
-	@echo "  install      - Install dependencies in venv"
-	@echo "  clean        - Remove virtual environment"
-	@echo "  test         - Run tests"
-	@echo "  lint         - Run linting"
-	@echo "  format       - Format code"
-	@echo "  frontend     - Install frontend dependencies"
-	@echo "  frontend-dev - Start frontend dev server"
+	@echo "  install        - Install all dependencies (backend + frontend)"
+	@echo "  install-backend - Install backend dependencies via uv sync"
+	@echo "  clean          - Remove virtual environment"
+	@echo "  test           - Run tests"
+	@echo "  lint           - Run linting"
+	@echo "  format         - Format code"
+	@echo "  frontend       - Install frontend dependencies"
+	@echo "  frontend-dev   - Start frontend dev server"
 	@echo "  frontend-build - Build frontend for production"
-	@echo "  run          - Run both backend and frontend (development)"
-	@echo "  all          - Create venv and install all dependencies"
+	@echo "  run            - Run both backend and frontend (development)"
 
-# Create UV virtual environment
-venv:
-	@echo "Creating UV virtual environment..."
-	uv venv
-
-# Install dependencies
-install-backend: venv
-	@echo "Installing dependencies..."
-	uv pip install -r backend/requirements.txt
+# Install backend dependencies
+install-backend:
+	@echo "Installing backend dependencies..."
+	cd backend && uv sync --dev
 
 # Remove virtual environment
 clean:
 	@echo "Removing virtual environment..."
-	rm -rf .venv
+	rm -rf backend/.venv
 
 # Run tests
 test:
 	@echo "Running tests..."
-	uv run pytest backend/tests/
+	cd backend && uv run pytest tests/
 
 # Run linting
 lint:
 	@echo "Running linting..."
-	uv run ruff check backend/
+	cd backend && uv run ruff check .
 
 # Format code
 format:
 	@echo "Formatting code..."
-	uv run ruff format backend/
+	cd backend && uv run ruff format .
 
 # Install frontend dependencies
 frontend:
@@ -61,9 +55,9 @@ frontend-build:
 	cd frontend && npm run build
 
 # Complete setup
-install: venv install-backend frontend
+install: install-backend frontend
 	@echo "Setup complete!"
-	@echo "Backend: uv run uvicorn backend.main:app --reload"
+	@echo "Backend: cd backend && uv run uvicorn main:app --reload"
 	@echo "Frontend: make frontend-dev"
 	@echo "Or run both together: make run"
 
@@ -75,5 +69,5 @@ run:
 	@echo "Press Ctrl+C to stop both servers"
 	@echo ""
 	@# Start backend in background, then frontend
-	@uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000 & \
+	@cd backend && uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000 & \
 	cd frontend && npm run dev
