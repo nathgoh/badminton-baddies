@@ -1,19 +1,26 @@
 import base64
 
 import cv2
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from models.schemas import DetectRequest, DetectResponse
 from services.detection import detect_persons
-from services.storage import get_video_dir
+from services.storage import StorageBackend, get_storage
 
 router = APIRouter(prefix="/api")
 
 
 @router.post("/detect", response_model=DetectResponse)
-async def detect(request: DetectRequest):
-    video_dir = get_video_dir(request.video_id)
-    video_files = list(video_dir.glob("*.mp4")) + list(video_dir.glob("*.avi")) + list(video_dir.glob("*.mov"))
+async def detect(
+    request: DetectRequest,
+    storage: StorageBackend = Depends(get_storage),
+):
+    video_dir = storage.get_video_dir(request.video_id)
+    video_files = (
+        list(video_dir.glob("*.mp4"))
+        + list(video_dir.glob("*.avi"))
+        + list(video_dir.glob("*.mov"))
+    )
     if not video_files:
         raise HTTPException(status_code=404, detail="Video not found")
 

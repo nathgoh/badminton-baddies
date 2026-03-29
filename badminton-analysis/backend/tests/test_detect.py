@@ -1,20 +1,31 @@
 from unittest.mock import patch
 
 import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 
 from main import app
 from models.schemas import BoundingBox
+from services.storage import LocalStorageBackend, get_storage
 
-client = TestClient(app)
+
+@pytest.fixture
+def storage(tmp_path):
+    return LocalStorageBackend(base_dir=str(tmp_path))
 
 
-def test_detect_persons(temp_storage):
-    from services.storage import get_video_dir
+@pytest.fixture
+def client(storage):
+    app.dependency_overrides[get_storage] = lambda: storage
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
 
+
+def test_detect_persons(client, storage):
     # Create a fake video file (1 frame, 100x100, 3 channels)
     video_id = "detect-test"
-    video_dir = get_video_dir(video_id)
+    video_dir = storage.get_video_dir(video_id)
 
     # We need a real video file for OpenCV to read, so create a minimal one
     import cv2
@@ -43,7 +54,7 @@ def test_detect_persons(temp_storage):
     assert data["persons"][0]["x"] == 10
 
 
-def test_detect_invalid_video():
+def test_detect_invalid_video(client):
     response = client.post(
         "/api/detect",
         json={"video_id": "nonexistent", "frame_number": 0},
