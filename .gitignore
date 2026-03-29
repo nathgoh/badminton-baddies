@@ -1,4 +1,6 @@
 .superpowers/
 .worktrees/
 signups/backend/.venv/
+signups/backend/.env
+signups/frontend/.env
 signups/.pytest_cache/
