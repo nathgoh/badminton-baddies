@@ -1,0 +1,399 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+import { createCourt, createSession, listSessions } from '../api/client'
+import { useAdminAuth } from '../auth/useAdminAuth'
+import type { Session } from '../types'
+
+interface NewCourtForm {
+  name: string
+  start_time: string
+  end_time: string
+  max_players: string
+  total_cost: string
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+export default function AdminSessionList() {
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [sessionName, setSessionName] = useState('')
+  const [sessionDate, setSessionDate] = useState('')
+  const [cancelWindow, setCancelWindow] = useState('48')
+  const [isNarrow, setIsNarrow] = useState(() => window.innerWidth < 900)
+  const [courts, setCourts] = useState<NewCourtForm[]>([
+    { name: '', start_time: '', end_time: '', max_players: '', total_cost: '' },
+  ])
+  const [error, setError] = useState<string | null>(null)
+  const { logout, email } = useAdminAuth()
+  const navigate = useNavigate()
+
+  async function load() {
+    setSessions(await listSessions())
+  }
+
+  useEffect(() => {
+    void load()
+  }, [])
+
+  useEffect(() => {
+    function handleResize() {
+      setIsNarrow(window.innerWidth < 900)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  async function handleCreate(event: React.FormEvent) {
+    event.preventDefault()
+    setError(null)
+    try {
+      const session = await createSession({
+        name: sessionName,
+        date: sessionDate,
+        is_active: false,
+        cancel_window_hours: parseInt(cancelWindow, 10),
+      })
+      for (const court of courts) {
+        if (!court.name) {
+          continue
+        }
+        await createCourt(session.id, {
+          name: court.name,
+          start_time: court.start_time,
+          end_time: court.end_time,
+          max_players: parseInt(court.max_players, 10),
+          total_cost: parseFloat(court.total_cost),
+        })
+      }
+      setShowForm(false)
+      setSessionName('')
+      setSessionDate('')
+      setCancelWindow('48')
+      setCourts([{ name: '', start_time: '', end_time: '', max_players: '', total_cost: '' }])
+      await load()
+    } catch (caughtError) {
+      setError(errorMessage(caughtError))
+    }
+  }
+
+  function updateCourt(index: number, field: keyof NewCourtForm, value: string) {
+    setCourts((current) =>
+      current.map((court, courtIndex) =>
+        courtIndex === index ? { ...court, [field]: value } : court,
+      ),
+    )
+  }
+
+  return (
+    <div style={{ maxWidth: 800, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 24,
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0 }}>HBB Admin</h2>
+          <div style={{ fontSize: 12, color: '#888' }}>{email}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => navigate('/admin/players')}
+            style={{
+              padding: '8px 16px',
+              border: '1px solid #ccc',
+              borderRadius: 4,
+              cursor: 'pointer',
+              background: 'white',
+            }}
+          >
+            Players
+          </button>
+          <button
+            onClick={logout}
+            style={{
+              padding: '8px 16px',
+              border: '1px solid #ccc',
+              borderRadius: 4,
+              cursor: 'pointer',
+              background: 'white',
+            }}
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 16,
+        }}
+      >
+        <h3 style={{ margin: 0 }}>Sessions</h3>
+        <button
+          onClick={() => setShowForm(true)}
+          style={{
+            padding: '8px 16px',
+            background: '#3f51b5',
+            color: 'white',
+            border: 'none',
+            borderRadius: 4,
+            cursor: 'pointer',
+          }}
+        >
+          + New session
+        </button>
+      </div>
+
+      {showForm ? (
+        <form
+          onSubmit={handleCreate}
+          style={{
+            border: '1px solid #c5cae9',
+            borderRadius: 8,
+            padding: 20,
+            marginBottom: 24,
+            background: '#f8f9ff',
+          }}
+        >
+          <h4 style={{ margin: '0 0 16px' }}>New Session</h4>
+          {error ? <div style={{ color: '#c62828', marginBottom: 12 }}>{error}</div> : null}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <div>
+              <label style={{ fontSize: 12 }}>Session name *</label>
+              <input
+                required
+                value={sessionName}
+                onChange={(event) => setSessionName(event.target.value)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: 8,
+                  border: '1px solid #ddd',
+                  borderRadius: 4,
+                  marginTop: 4,
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12 }}>Date *</label>
+              <input
+                type="date"
+                required
+                value={sessionDate}
+                onChange={(event) => setSessionDate(event.target.value)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: 8,
+                  border: '1px solid #ddd',
+                  borderRadius: 4,
+                  marginTop: 4,
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12 }}>Cancel window (hours)</label>
+              <input
+                type="number"
+                value={cancelWindow}
+                onChange={(event) => setCancelWindow(event.target.value)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: 8,
+                  border: '1px solid #ddd',
+                  borderRadius: 4,
+                  marginTop: 4,
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Courts</div>
+          {courts.map((court, index) => (
+            <div
+              key={index}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isNarrow
+                  ? '1fr'
+                  : 'minmax(180px, 2fr) repeat(4, minmax(110px, 1fr)) auto',
+                gap: 8,
+                marginBottom: 8,
+                alignItems: 'stretch',
+              }}
+            >
+              <input
+                placeholder="Court name"
+                value={court.name}
+                onChange={(event) => updateCourt(index, 'name', event.target.value)}
+                style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
+              />
+              <input
+                placeholder="Start"
+                value={court.start_time}
+                onChange={(event) => updateCourt(index, 'start_time', event.target.value)}
+                style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
+              />
+              <input
+                placeholder="End"
+                value={court.end_time}
+                onChange={(event) => updateCourt(index, 'end_time', event.target.value)}
+                style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
+              />
+              <input
+                placeholder="Max players"
+                type="number"
+                value={court.max_players}
+                onChange={(event) => updateCourt(index, 'max_players', event.target.value)}
+                style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
+              />
+              <input
+                placeholder="Cost $"
+                type="number"
+                value={court.total_cost}
+                onChange={(event) => updateCourt(index, 'total_cost', event.target.value)}
+                style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setCourts((current) => current.filter((_, courtIndex) => courtIndex !== index))
+                }
+                style={{
+                  padding: '6px 8px',
+                  background: 'white',
+                  border: '1px solid #ffcdd2',
+                  borderRadius: 4,
+                  color: '#c62828',
+                  cursor: 'pointer',
+                  alignSelf: isNarrow ? 'start' : 'stretch',
+                  justifySelf: isNarrow ? 'start' : 'stretch',
+                }}
+              >
+                x
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setCourts((current) => [
+                ...current,
+                { name: '', start_time: '', end_time: '', max_players: '', total_cost: '' },
+              ])
+            }
+            style={{
+              fontSize: 12,
+              padding: '4px 10px',
+              background: 'white',
+              border: '1px solid #ccc',
+              borderRadius: 4,
+              cursor: 'pointer',
+              marginBottom: 16,
+            }}
+          >
+            + Add court
+          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="submit"
+              style={{
+                padding: '8px 20px',
+                background: '#3f51b5',
+                color: 'white',
+                border: 'none',
+                borderRadius: 4,
+                cursor: 'pointer',
+              }}
+            >
+              Create
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              style={{
+                padding: '8px 20px',
+                background: 'white',
+                border: '1px solid #ccc',
+                borderRadius: 4,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      <div style={{ border: '1px solid #e0e0e0', borderRadius: 8, overflow: 'hidden' }}>
+        {sessions.length === 0 ? (
+          <div style={{ padding: 24, textAlign: 'center', color: '#aaa' }}>No sessions yet</div>
+        ) : null}
+        {sessions.map((session) => (
+          <div
+            key={session.id}
+            style={{
+              padding: '14px 16px',
+              borderBottom: '1px solid #f0f0f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 600 }}>{session.name}</div>
+              <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{session.date}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {session.is_active ? (
+                <span
+                  style={{
+                    background: '#e8f5e9',
+                    color: '#2e7d32',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                  }}
+                >
+                  Active
+                </span>
+              ) : null}
+              <button
+                onClick={() => navigate(`/admin/sessions/${session.id}`)}
+                style={{
+                  padding: '6px 12px',
+                  background: 'white',
+                  border: '1px solid #ccc',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                }}
+              >
+                Manage
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
