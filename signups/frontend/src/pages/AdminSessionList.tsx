@@ -203,6 +203,7 @@ export default function AdminSessionList() {
               <input
                 type="date"
                 required
+                min={new Date().toISOString().slice(0, 10)}
                 value={sessionDate}
                 onChange={(event) => setSessionDate(event.target.value)}
                 style={{
