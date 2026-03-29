@@ -253,12 +253,14 @@ export default function AdminSessionList() {
                 style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
               />
               <input
+                type="time"
                 placeholder="Start"
                 value={court.start_time}
                 onChange={(event) => updateCourt(index, 'start_time', event.target.value)}
                 style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
               />
               <input
+                type="time"
                 placeholder="End"
                 value={court.end_time}
                 onChange={(event) => updateCourt(index, 'end_time', event.target.value)}
