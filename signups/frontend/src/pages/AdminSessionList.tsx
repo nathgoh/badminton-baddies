@@ -138,6 +138,76 @@ export default function AdminSessionList() {
   const upcomingSessions = sessions.filter((s) => !isPastSession(s.date))
   const pastSessions = sessions.filter((s) => isPastSession(s.date))
 
+  function renderCard(session: Session) {
+    const isExpanded = expandedId === session.id
+
+    return (
+      <Fragment key={session.id}>
+        <article className={`admin-session-card${isExpanded ? ' is-expanded' : ''}`}>
+          <button
+            className="admin-session-card-main"
+            onClick={() => void handleRowClick(session)}
+            type="button"
+          >
+            <div className="admin-session-card-top">
+              <span className="admin-session-card-chevron" aria-hidden="true">
+                {isExpanded ? '▾' : '▸'}
+              </span>
+              <span className={`admin-session-card-status${session.is_active ? ' is-active' : ''}`}>
+                {session.is_active ? 'Active' : 'Draft'}
+              </span>
+            </div>
+
+            <div className="admin-session-card-copy">
+              <div className="admin-session-card-name">{session.name}</div>
+              <div className="admin-session-card-date">{session.date}</div>
+            </div>
+
+            <div className="admin-session-card-stats">
+              <div className="admin-session-card-stat">
+                <span className="admin-session-card-stat-label">Cancel window</span>
+                <strong>{formatCancelWindow(session.cancel_window_hours)}</strong>
+              </div>
+              <div className="admin-session-card-stat">
+                <span className="admin-session-card-stat-label">Details</span>
+                <strong>{isExpanded ? 'Open' : 'Closed'}</strong>
+              </div>
+            </div>
+          </button>
+
+          <div className="admin-session-card-actions">
+            <Link
+              className="admin-session-card-link"
+              onClick={(event) => event.stopPropagation()}
+              to={`/admin/sessions/${session.id}`}
+            >
+              Open details
+            </Link>
+            <button
+              className="admin-sessions-delete-button"
+              onClick={() => void handleDelete(session)}
+              type="button"
+            >
+              Delete
+            </button>
+          </div>
+        </article>
+
+        {isExpanded && expandedData ? (
+          <div className="admin-session-expanded">
+            <div className="admin-session-expanded-grid">
+              <CostCalculator data={expandedData} onRefresh={() => void handleExpandedRefresh()} />
+              <RosterManager
+                onRefresh={() => void handleExpandedRefresh()}
+                signups={expandedData.signups}
+              />
+            </div>
+          </div>
+        ) : null}
+      </Fragment>
+    )
+  }
+
   return (
     <div className="admin-sessions-page">
       <section className="admin-sessions-hero">
@@ -347,75 +417,7 @@ export default function AdminSessionList() {
           <div className="admin-session-empty-state">No sessions yet</div>
         ) : null}
 
-        {upcomingSessions.map((session) => {
-          const isExpanded = expandedId === session.id
-
-          return (
-            <Fragment key={session.id}>
-              <article className={`admin-session-card${isExpanded ? ' is-expanded' : ''}`}>
-                <button
-                  className="admin-session-card-main"
-                  onClick={() => void handleRowClick(session)}
-                  type="button"
-                >
-                  <div className="admin-session-card-top">
-                    <span className="admin-session-card-chevron" aria-hidden="true">
-                      {isExpanded ? '▾' : '▸'}
-                    </span>
-                    <span className={`admin-session-card-status${session.is_active ? ' is-active' : ''}`}>
-                      {session.is_active ? 'Active' : 'Draft'}
-                    </span>
-                  </div>
-
-                  <div className="admin-session-card-copy">
-                    <div className="admin-session-card-name">{session.name}</div>
-                    <div className="admin-session-card-date">{session.date}</div>
-                  </div>
-
-                  <div className="admin-session-card-stats">
-                    <div className="admin-session-card-stat">
-                      <span className="admin-session-card-stat-label">Cancel window</span>
-                      <strong>{formatCancelWindow(session.cancel_window_hours)}</strong>
-                    </div>
-                    <div className="admin-session-card-stat">
-                      <span className="admin-session-card-stat-label">Details</span>
-                      <strong>{isExpanded ? 'Open' : 'Closed'}</strong>
-                    </div>
-                  </div>
-                </button>
-
-                <div className="admin-session-card-actions">
-                  <Link
-                    className="admin-session-card-link"
-                    onClick={(event) => event.stopPropagation()}
-                    to={`/admin/sessions/${session.id}`}
-                  >
-                    Open details
-                  </Link>
-                  <button
-                    className="admin-sessions-delete-button"
-                    onClick={() => void handleDelete(session)}
-                    type="button"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </article>
-
-              {isExpanded && expandedData ? (
-                <div className="admin-session-expanded">
-                  <div className="admin-session-expanded-grid">
-                    <CostCalculator data={expandedData} onRefresh={() => void handleExpandedRefresh()} />
-                    <RosterManager
-                      onRefresh={() => void handleExpandedRefresh()}
-                      signups={expandedData.signups}
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </Fragment>
-          )
-        })}
+        {upcomingSessions.map(renderCard)}
       </div>
 
       <section className="admin-sessions-toolbar">
@@ -430,75 +432,7 @@ export default function AdminSessionList() {
           <div className="admin-session-empty-state">No past sessions</div>
         ) : null}
 
-        {pastSessions.map((session) => {
-          const isExpanded = expandedId === session.id
-
-          return (
-            <Fragment key={session.id}>
-              <article className={`admin-session-card${isExpanded ? ' is-expanded' : ''}`}>
-                <button
-                  className="admin-session-card-main"
-                  onClick={() => void handleRowClick(session)}
-                  type="button"
-                >
-                  <div className="admin-session-card-top">
-                    <span className="admin-session-card-chevron" aria-hidden="true">
-                      {isExpanded ? '▾' : '▸'}
-                    </span>
-                    <span className={`admin-session-card-status${session.is_active ? ' is-active' : ''}`}>
-                      {session.is_active ? 'Active' : 'Draft'}
-                    </span>
-                  </div>
-
-                  <div className="admin-session-card-copy">
-                    <div className="admin-session-card-name">{session.name}</div>
-                    <div className="admin-session-card-date">{session.date}</div>
-                  </div>
-
-                  <div className="admin-session-card-stats">
-                    <div className="admin-session-card-stat">
-                      <span className="admin-session-card-stat-label">Cancel window</span>
-                      <strong>{formatCancelWindow(session.cancel_window_hours)}</strong>
-                    </div>
-                    <div className="admin-session-card-stat">
-                      <span className="admin-session-card-stat-label">Details</span>
-                      <strong>{isExpanded ? 'Open' : 'Closed'}</strong>
-                    </div>
-                  </div>
-                </button>
-
-                <div className="admin-session-card-actions">
-                  <Link
-                    className="admin-session-card-link"
-                    onClick={(event) => event.stopPropagation()}
-                    to={`/admin/sessions/${session.id}`}
-                  >
-                    Open details
-                  </Link>
-                  <button
-                    className="admin-sessions-delete-button"
-                    onClick={() => void handleDelete(session)}
-                    type="button"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </article>
-
-              {isExpanded && expandedData ? (
-                <div className="admin-session-expanded">
-                  <div className="admin-session-expanded-grid">
-                    <CostCalculator data={expandedData} onRefresh={() => void handleExpandedRefresh()} />
-                    <RosterManager
-                      onRefresh={() => void handleExpandedRefresh()}
-                      signups={expandedData.signups}
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </Fragment>
-          )
-        })}
+        {pastSessions.map(renderCard)}
       </div>
     </div>
   )
