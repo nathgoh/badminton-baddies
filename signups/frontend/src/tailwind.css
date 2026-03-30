@@ -1,0 +1,38 @@
+@import "tailwindcss";
+@import "./styles.css";
+
+@theme {
+  --font-sans: "Inter", "Avenir Next", "Segoe UI", sans-serif;
+  --color-ink-950: #172033;
+  --color-ink-700: #334155;
+  --color-sand-50: #fffaf2;
+  --color-sand-100: #f6ede0;
+  --color-mint-500: #2f8f83;
+  --color-amber-500: #d97706;
+  --radius-4xl: 2rem;
+  --shadow-soft: 0 18px 45px rgba(23, 32, 51, 0.12);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background:
+      radial-gradient(circle at top, rgba(245, 158, 11, 0.12), transparent 30%),
+      linear-gradient(180deg, #fffaf2 0%, #f8fbff 100%);
+    color: var(--color-ink-950);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
