@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { calculateCosts, createCourt, deleteCourt, regenerateToken, updateCourt, updateSession } from '../api/client'
 import { formatTime } from '../utils'
+import { useMobile } from '../hooks/useMobile'
 import type { AdminSessionResponse } from '../types'
 
 interface Props {
@@ -25,6 +26,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
   const [showAddCourt, setShowAddCourt] = useState(false)
   const [newCourt, setNewCourt] = useState(EMPTY_COURT)
   const [addingCourt, setAddingCourt] = useState(false)
+  const isMobile = useMobile()
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<CourtEdit | null>(null)
 
@@ -160,7 +162,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
               style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', background: '#f8f9ff' }}
             >
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{court.name}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 6, marginBottom: 6 }}>
                 <input
                   required
                   type="time"
@@ -176,7 +178,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
                   style={{ padding: 5, border: '1px solid #c5cae9', borderRadius: 4, fontSize: 12 }}
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 6, marginBottom: 8 }}>
                 <input
                   required
                   type="number"
@@ -259,7 +261,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
             background: '#f8f9ff',
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
             <input
               required
               placeholder="Court name"
@@ -282,7 +284,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
               style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
             />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <input
               required
               type="number"
