@@ -19,8 +19,6 @@ describe('AdminSessionDetail structure hooks', () => {
 
   it('renders status badge only once', () => {
     const matches = AdminSessionDetailSource.match(/admin-pill/g)
-    // Two occurrences: one in the hero card, one in the loading state (or just one total)
-    // The hero card should be the only pill in the main render
-    expect(matches).not.toBeNull()
+    expect(matches?.length).toBe(1)
   })
 })
