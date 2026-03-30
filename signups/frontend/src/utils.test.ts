@@ -56,9 +56,15 @@ describe('formatDisplayDate', () => {
 })
 
 describe('formatCancellationStatus', () => {
+  it('returns days and hours before the cancellation cutoff', () => {
+    expect(
+      formatCancellationStatus('2026-04-16', 48, new Date('2026-04-11T18:00:00Z')),
+    ).toBe('Cancellation closes in 2d 6h')
+  })
+
   it('returns remaining time before the cancellation cutoff', () => {
     expect(
-      formatCancellationStatus('2026-04-16', 48, new Date('2026-04-13T18:00:00Z')),
+      formatCancellationStatus('2026-04-16', 48, new Date('2026-04-13T10:00:00Z')),
     ).toBe('Cancellation closes in 14h')
   })
 
