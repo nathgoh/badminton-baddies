@@ -5,6 +5,7 @@ import CostCalculator from '../components/CostCalculator'
 import RosterManager from '../components/RosterManager'
 import { createCourt, createSession, deleteSession, getAdminSession, listSessions } from '../api/client'
 import { useAdminAuth } from '../auth/useAdminAuth'
+import { useMobile } from '../hooks/useMobile'
 import { nextExpandedId } from '../utils'
 import type { AdminSessionResponse, Session } from '../types'
 
@@ -26,7 +27,6 @@ export default function AdminSessionList() {
   const [sessionName, setSessionName] = useState('')
   const [sessionDate, setSessionDate] = useState('')
   const [cancelWindow, setCancelWindow] = useState('48')
-  const [isNarrow, setIsNarrow] = useState(() => window.innerWidth < 900)
   const [courts, setCourts] = useState<NewCourtForm[]>([
     { name: '', start_time: '19:00', end_time: '22:00', max_players: '6', total_cost: '' },
   ])
@@ -36,6 +36,7 @@ export default function AdminSessionList() {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const { logout, email } = useAdminAuth()
   const navigate = useNavigate()
+  const isMobile = useMobile()
 
   async function load() {
     setSessions(await listSessions())
@@ -43,14 +44,6 @@ export default function AdminSessionList() {
 
   useEffect(() => {
     void load()
-  }, [])
-
-  useEffect(() => {
-    function handleResize() {
-      setIsNarrow(window.innerWidth < 900)
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   async function handleRowClick(session: Session) {
@@ -136,7 +129,14 @@ export default function AdminSessionList() {
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' }}>
       <div
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}
+        style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'flex-start' : 'center',
+          gap: isMobile ? 12 : 0,
+          marginBottom: 24,
+        }}
       >
         <div>
           <h2 style={{ margin: 0 }}>Court Signup Admin</h2>
@@ -178,7 +178,7 @@ export default function AdminSessionList() {
           <h4 style={{ margin: '0 0 16px' }}>New Session</h4>
           {error ? <div style={{ color: '#c62828', marginBottom: 12 }}>{error}</div> : null}
           <div
-            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}
+            style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}
           >
             <div>
               <label style={{ fontSize: 12 }}>Session name *</label>
@@ -216,7 +216,7 @@ export default function AdminSessionList() {
               key={index}
               style={{
                 display: 'grid',
-                gridTemplateColumns: isNarrow
+                gridTemplateColumns: isMobile
                   ? '1fr'
                   : 'minmax(180px, 2fr) repeat(4, minmax(110px, 1fr)) auto',
                 gap: 8,
@@ -274,8 +274,8 @@ export default function AdminSessionList() {
                   borderRadius: 4,
                   color: '#c62828',
                   cursor: 'pointer',
-                  alignSelf: isNarrow ? 'start' : 'stretch',
-                  justifySelf: isNarrow ? 'start' : 'stretch',
+                  alignSelf: isMobile ? 'start' : 'stretch',
+                  justifySelf: isMobile ? 'start' : 'stretch',
                 }}
               >
                 x
@@ -365,7 +365,7 @@ export default function AdminSessionList() {
             </div>
             {expandedId === session.id && expandedData ? (
               <div style={{ background: '#f8f9ff', borderBottom: '2px solid #c5cae9', padding: 16 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 24 }}>
                   <CostCalculator data={expandedData} onRefresh={() => void handleExpandedRefresh()} />
                   <RosterManager signups={expandedData.signups} onRefresh={() => void handleExpandedRefresh()} />
                 </div>
