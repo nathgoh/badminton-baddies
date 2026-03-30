@@ -306,7 +306,25 @@ textarea {
   gap: 4px;
 }
 
+.public-signup-form-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #1e2d7d;
+}
+
+.public-signup-inline-error {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #f3c7c4;
+  background: #fff2f1;
+  color: #b42318;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .public-signup-field label,
+.public-signup-field span,
 .public-signup-form label {
   font-size: 0.82rem;
   font-weight: 600;
@@ -380,7 +398,53 @@ textarea {
   color: #5b6288;
 }
 
+.public-signup-checkbox {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #dde3fb;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 255, 0.96) 0%, rgba(241, 244, 255, 0.96) 100%);
+  color: #4b5586;
+  cursor: pointer;
+  line-height: 1.45;
+}
+
+.public-signup-checkbox input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: #4b57d2;
+}
+
+.public-signup-checkbox span {
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.public-signup-submit {
+  width: 100%;
+}
+
+.public-signup-submit:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.public-signup-form-closed {
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px dashed #d8def7;
+  background: #f8f9ff;
+  color: #6b74a8;
+  text-align: center;
+}
+
 .public-signup-primary-button,
+.public-signup-submit,
 .public-signup-secondary-button,
 .public-signup-danger-button {
   appearance: none;
@@ -403,10 +467,17 @@ textarea {
 }
 
 .public-signup-primary-button:hover,
+.public-signup-submit:hover:not(:disabled),
 .public-signup-secondary-button:hover,
 .public-signup-danger-button:hover,
 .public-signup-cancel-trigger:hover {
   transform: translateY(-1px);
+}
+
+.public-signup-submit {
+  background: linear-gradient(180deg, #4b57d2 0%, #3f4ec5 100%);
+  color: #fff;
+  box-shadow: 0 12px 20px rgba(63, 78, 197, 0.2);
 }
 
 .public-signup-secondary-button {

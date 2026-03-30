@@ -59,107 +59,56 @@ export default function SignupForm({ token, isActive, isFull, onSuccess }: Props
   }
 
   if (!isActive) {
-    return (
-      <div style={{ padding: 20, textAlign: 'center', color: '#888' }}>
-        Signups are closed for this session.
-      </div>
-    )
+    return <div className="public-signup-form-closed">Signups are closed for this session.</div>
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        border: '1px solid #c5cae9',
-        borderRadius: 8,
-        padding: 20,
-        marginBottom: 16,
-      }}
-    >
-      <div style={{ fontWeight: 600, marginBottom: 16 }}>Sign up</div>
-      {error ? (
-        <div style={{ color: '#c62828', marginBottom: 12, fontSize: 13 }}>{error}</div>
-      ) : null}
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ fontSize: 12, color: '#555' }}>Email *</label>
+    <form onSubmit={handleSubmit} className="public-signup-form-card">
+      <div className="public-signup-form-title">Sign up</div>
+      {error ? <div className="public-signup-inline-error">{error}</div> : null}
+      <label className="public-signup-field">
+        <span>Email *</span>
         <input
           type="email"
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           onBlur={handleEmailBlur}
-          style={{
-            display: 'block',
-            width: '100%',
-            padding: 8,
-            border: '1px solid #ddd',
-            borderRadius: 4,
-            marginTop: 4,
-          }}
         />
-      </div>
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ fontSize: 12, color: '#555' }}>Name *</label>
+      </label>
+      <label className="public-signup-field">
+        <span>Name *</span>
         <input
           type="text"
           required
           value={name}
           onChange={(event) => setName(event.target.value)}
-          style={{
-            display: 'block',
-            width: '100%',
-            padding: 8,
-            border: '1px solid #ddd',
-            borderRadius: 4,
-            marginTop: 4,
-          }}
         />
-      </div>
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ fontSize: 12, color: '#555' }}>Venmo or Phone Number *</label>
+      </label>
+      <label className="public-signup-field">
+        <span>Venmo or Phone Number *</span>
         <input
           type="text"
           required
           value={venmo}
           onChange={(event) => setVenmo(event.target.value)}
-          style={{
-            display: 'block',
-            width: '100%',
-            padding: 8,
-            border: '1px solid #ddd',
-            borderRadius: 4,
-            marginTop: 4,
-          }}
         />
-      </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 16 }}>
+      </label>
+      <label className="public-signup-checkbox" htmlFor="payment-agree">
         <input
+          id="payment-agree"
           type="checkbox"
           checked={agreed}
           onChange={(event) => setAgreed(event.target.checked)}
-          style={{ marginTop: 3 }}
         />
-        <label style={{ fontSize: 12, color: '#555' }}>
+        <span>
           I agree to pay if I do not cancel 48 hrs in advance unless I can find
           someone to fill in *
-        </label>
-      </div>
-      <button
-        type="submit"
-        disabled={loading}
-        style={{
-          width: '100%',
-          padding: 10,
-          background: '#3f51b5',
-          color: 'white',
-          border: 'none',
-          borderRadius: 6,
-          cursor: 'pointer',
-        }}
-      >
+        </span>
+      </label>
+      <button type="submit" disabled={loading} className="public-signup-submit">
         {loading ? 'Signing up...' : isFull ? 'Join waitlist' : 'Sign up'}
       </button>
     </form>
   )
 }
-
