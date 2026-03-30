@@ -28,11 +28,9 @@ textarea {
   max-width: 720px;
   margin: 0 auto;
   padding: 24px 16px 40px;
+  display: grid;
+  gap: 16px;
   color: #18224f;
-}
-
-.public-signup-page > * + * {
-  margin-top: 16px;
 }
 
 .public-signup-hero {
@@ -99,8 +97,7 @@ textarea {
   color: #2c3a95;
 }
 
-.public-signup-tab[aria-selected='true'],
-.public-signup-tab.is-active {
+.public-signup-tab[aria-selected='true'] {
   color: #24328f;
   border-bottom-color: #4b57d2;
 }
@@ -149,13 +146,13 @@ textarea {
   color: #1e2d7d;
 }
 
-.public-signup-form-card form,
+.public-signup-form-card,
 .public-signup-form {
   display: grid;
   gap: 12px;
 }
 
-.public-signup-form-card form > *,
+.public-signup-form-card > *,
 .public-signup-form > * {
   min-width: 0;
 }
@@ -172,12 +169,28 @@ textarea {
   color: #5b6288;
 }
 
-.public-signup-field input,
-.public-signup-field select,
-.public-signup-field textarea,
-.public-signup-form input,
-.public-signup-form select,
-.public-signup-form textarea {
+.public-signup-field :is(
+    input[type='text'],
+    input[type='email'],
+    input[type='tel'],
+    input[type='url'],
+    input[type='password'],
+    input[type='search'],
+    input[type='number'],
+    textarea,
+    select
+  ),
+.public-signup-form :is(
+    input[type='text'],
+    input[type='email'],
+    input[type='tel'],
+    input[type='url'],
+    input[type='password'],
+    input[type='search'],
+    input[type='number'],
+    textarea,
+    select
+  ) {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid #d7def7;
@@ -189,12 +202,28 @@ textarea {
     box-shadow 160ms ease;
 }
 
-.public-signup-field input:focus,
-.public-signup-field select:focus,
-.public-signup-field textarea:focus,
-.public-signup-form input:focus,
-.public-signup-form select:focus,
-.public-signup-form textarea:focus {
+.public-signup-field :is(
+    input[type='text'],
+    input[type='email'],
+    input[type='tel'],
+    input[type='url'],
+    input[type='password'],
+    input[type='search'],
+    input[type='number'],
+    textarea,
+    select
+  ):focus,
+.public-signup-form :is(
+    input[type='text'],
+    input[type='email'],
+    input[type='tel'],
+    input[type='url'],
+    input[type='password'],
+    input[type='search'],
+    input[type='number'],
+    textarea,
+    select
+  ):focus {
   outline: none;
   border-color: #6674f0;
   box-shadow: 0 0 0 3px rgba(102, 116, 240, 0.15);
@@ -260,9 +289,6 @@ textarea {
   border-radius: 16px;
   background: #eef1ff;
   color: #24328f;
-}
-
-.public-signup-cancel-trigger strong {
   font-weight: 700;
 }
 
