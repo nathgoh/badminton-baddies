@@ -5,8 +5,7 @@ import CostCalculator from '../components/CostCalculator'
 import RosterManager from '../components/RosterManager'
 import { createCourt, createSession, deleteSession, getAdminSession, listSessions } from '../api/client'
 import { useAdminAuth } from '../auth/useAdminAuth'
-import { useMobile } from '../hooks/useMobile'
-import { nextExpandedId } from '../utils'
+import { nextExpandedId, isPastSession } from '../utils'
 import type { AdminSessionResponse, Session } from '../types'
 
 interface NewCourtForm {
@@ -21,6 +20,15 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
+function formatCancelWindow(hours: number) {
+  if (hours % 24 === 0) {
+    const days = hours / 24
+    return `${days} day${days === 1 ? '' : 's'}`
+  }
+
+  return `${hours} hour${hours === 1 ? '' : 's'}`
+}
+
 export default function AdminSessionList() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -33,10 +41,8 @@ export default function AdminSessionList() {
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedData, setExpandedData] = useState<AdminSessionResponse | null>(null)
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
   const { logout, email } = useAdminAuth()
   const navigate = useNavigate()
-  const isMobile = useMobile()
 
   async function load() {
     setSessions(await listSessions())
@@ -51,19 +57,21 @@ export default function AdminSessionList() {
     if (newId === null) {
       setExpandedId(null)
       setExpandedData(null)
-    } else {
-      try {
-        const data = await getAdminSession(session.id)
-        setExpandedId(session.id)
-        setExpandedData(data)
-      } catch (caughtError) {
-        setError(errorMessage(caughtError))
-      }
+      return
+    }
+
+    try {
+      const data = await getAdminSession(session.id)
+      setExpandedId(session.id)
+      setExpandedData(data)
+    } catch (caughtError) {
+      setError(errorMessage(caughtError))
     }
   }
 
   async function handleExpandedRefresh() {
     if (!expandedId) return
+
     try {
       setExpandedData(await getAdminSession(expandedId))
     } catch (caughtError) {
@@ -74,6 +82,7 @@ export default function AdminSessionList() {
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
+
     try {
       const session = await createSession({
         name: sessionName,
@@ -81,8 +90,10 @@ export default function AdminSessionList() {
         is_active: false,
         cancel_window_hours: parseInt(cancelWindow, 10),
       })
+
       for (const court of courts) {
         if (!court.name) continue
+
         await createCourt(session.id, {
           name: court.name,
           start_time: court.start_time,
@@ -91,6 +102,7 @@ export default function AdminSessionList() {
           total_cost: parseFloat(court.total_cost),
         })
       }
+
       setShowForm(false)
       setSessionName('')
       setSessionDate('')
@@ -104,12 +116,14 @@ export default function AdminSessionList() {
 
   async function handleDelete(session: Session) {
     if (!confirm(`Delete "${session.name}"? This cannot be undone.`)) return
+
     await deleteSession(session.id)
+
     if (expandedId === session.id) {
       setExpandedId(null)
       setExpandedData(null)
     }
-    setHoveredId(null)
+
     await load()
   }
 
@@ -121,190 +135,204 @@ export default function AdminSessionList() {
     )
   }
 
-  function rowBackground(sessionId: string) {
-    if (expandedId === sessionId) return hoveredId === sessionId ? '#eaedff' : '#f0f4ff'
-    return hoveredId === sessionId ? '#f5f6ff' : 'white'
-  }
+  const upcomingSessions = sessions.filter((s) => !isPastSession(s.date))
+  const pastSessions = sessions.filter((s) => isPastSession(s.date))
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' }}>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: isMobile ? 'column' : 'row',
-          justifyContent: 'space-between',
-          alignItems: isMobile ? 'flex-start' : 'center',
-          gap: isMobile ? 12 : 0,
-          marginBottom: 24,
-        }}
-      >
-        <div>
-          <h2 style={{ margin: 0 }}>Court Signup Admin</h2>
-          <div style={{ fontSize: 12, color: '#888' }}>{email}</div>
+    <div className="admin-sessions-page">
+      <section className="admin-sessions-hero">
+        <div className="admin-sessions-hero-copy">
+          <div className="admin-sessions-eyebrow">Court signup admin</div>
+          <h1 className="admin-sessions-title">Sessions</h1>
+          <p className="admin-sessions-subtitle">
+            Manage session setup, court pricing, and roster changes from one mobile-friendly queue.
+          </p>
+          <div className="admin-sessions-email">{email}</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+
+        <div className="admin-sessions-actions">
           <button
+            className="admin-sessions-action-button"
             onClick={() => navigate('/admin/players')}
-            style={{ padding: '8px 16px', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', background: 'white' }}
+            type="button"
           >
             Players
           </button>
           <button
-            onClick={() => { logout(); navigate('/admin/login') }}
-            style={{ padding: '8px 16px', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', background: 'white' }}
+            className="admin-sessions-action-button"
+            onClick={() => {
+              logout()
+              navigate('/admin/login')
+            }}
+            type="button"
           >
             Sign out
           </button>
         </div>
-      </div>
+      </section>
 
-      <div
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}
-      >
-        <h3 style={{ margin: 0 }}>Sessions</h3>
+      <section className="admin-sessions-toolbar">
+        <div>
+          <div className="admin-sessions-toolbar-label">Admin queue</div>
+          <h2 className="admin-sessions-toolbar-title">Upcoming sessions</h2>
+        </div>
         <button
+          className="admin-sessions-primary-button"
           onClick={() => setShowForm(true)}
-          style={{ padding: '8px 16px', background: '#3f51b5', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+          type="button"
         >
           + New session
         </button>
-      </div>
+      </section>
 
       {showForm ? (
-        <form
-          onSubmit={handleCreate}
-          style={{ border: '1px solid #c5cae9', borderRadius: 8, padding: 20, marginBottom: 24, background: '#f8f9ff' }}
-        >
-          <h4 style={{ margin: '0 0 16px' }}>New Session</h4>
-          {error ? <div style={{ color: '#c62828', marginBottom: 12 }}>{error}</div> : null}
-          <div
-            style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}
-          >
+        <form className="admin-session-form" onSubmit={handleCreate}>
+          <div className="admin-session-form-header">
             <div>
-              <label style={{ fontSize: 12 }}>Session name *</label>
+              <div className="admin-session-form-label">New session</div>
+              <h3 className="admin-session-form-title">Create a session</h3>
+            </div>
+            <button
+              className="admin-sessions-action-button"
+              onClick={() => setShowForm(false)}
+              type="button"
+            >
+              Close
+            </button>
+          </div>
+
+          {error ? <div className="admin-sessions-inline-error">{error}</div> : null}
+
+          <div className="admin-session-fields">
+            <label className="admin-session-field">
+              <span>Session name *</span>
               <input
+                onChange={(event) => setSessionName(event.target.value)}
                 required
                 value={sessionName}
-                onChange={(event) => setSessionName(event.target.value)}
-                style={{ display: 'block', width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 4, marginTop: 4, boxSizing: 'border-box', height: 36 }}
               />
-            </div>
-            <div>
-              <label style={{ fontSize: 12 }}>Date *</label>
+            </label>
+            <label className="admin-session-field">
+              <span>Date *</span>
               <input
-                type="date"
-                required
                 min={new Date().toISOString().slice(0, 10)}
-                value={sessionDate}
                 onChange={(event) => setSessionDate(event.target.value)}
-                style={{ display: 'block', width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 4, marginTop: 4, boxSizing: 'border-box', height: 36 }}
+                required
+                type="date"
+                value={sessionDate}
               />
-            </div>
-            <div>
-              <label style={{ fontSize: 12 }}>Cancel window (hours)</label>
+            </label>
+            <label className="admin-session-field">
+              <span>Cancel window (hours)</span>
               <input
+                onChange={(event) => setCancelWindow(event.target.value)}
                 type="number"
                 value={cancelWindow}
-                onChange={(event) => setCancelWindow(event.target.value)}
-                style={{ display: 'block', width: '100%', padding: 8, border: '1px solid #ddd', borderRadius: 4, marginTop: 4, boxSizing: 'border-box', height: 36 }}
               />
-            </div>
+            </label>
           </div>
-          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Courts</div>
-          {courts.map((court, index) => (
-            <div
-              key={index}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile
-                  ? '1fr'
-                  : 'minmax(180px, 2fr) repeat(4, minmax(110px, 1fr)) auto',
-                gap: 8,
-                marginBottom: 8,
-                alignItems: 'stretch',
-              }}
-            >
-              <input
-                placeholder="Court name"
-                value={court.name}
-                onChange={(event) => updateCourt(index, 'name', event.target.value)}
-                style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
-              />
-              <input
-                type="time"
-                value={court.start_time}
-                onChange={(event) => updateCourt(index, 'start_time', event.target.value)}
-                style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
-              />
-              <input
-                type="time"
-                value={court.end_time}
-                onChange={(event) => updateCourt(index, 'end_time', event.target.value)}
-                style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
-              />
-              <input
-                placeholder="Max players"
-                type="number"
-                min="1"
-                value={court.max_players}
-                onChange={(event) => updateCourt(index, 'max_players', event.target.value)}
-                style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
-              />
-              <input
-                placeholder="Cost $"
-                type="number"
-                value={court.total_cost}
-                onChange={(event) => updateCourt(index, 'total_cost', event.target.value)}
-                style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (courts.length === 1) {
-                    setError('At least one court is required.')
-                    return
-                  }
-                  setError(null)
-                  setCourts((current) => current.filter((_, courtIndex) => courtIndex !== index))
-                }}
-                style={{
-                  padding: '6px 8px',
-                  background: 'white',
-                  border: '1px solid #ffcdd2',
-                  borderRadius: 4,
-                  color: '#c62828',
-                  cursor: 'pointer',
-                  alignSelf: isMobile ? 'start' : 'stretch',
-                  justifySelf: isMobile ? 'start' : 'stretch',
-                }}
-              >
-                x
-              </button>
+
+          <div className="admin-session-courts-header">
+            <div>
+              <div className="admin-session-form-label">Courts</div>
+              <h4 className="admin-session-courts-title">Court blocks</h4>
             </div>
-          ))}
-          <button
-            type="button"
-            onClick={() =>
-              setCourts((current) => [
-                ...current,
-                { name: '', start_time: '19:00', end_time: '22:00', max_players: '6', total_cost: '' },
-              ])
-            }
-            style={{ fontSize: 12, padding: '4px 10px', background: 'white', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', marginBottom: 16 }}
-          >
-            + Add court
-          </button>
-          <div style={{ display: 'flex', gap: 8 }}>
             <button
-              type="submit"
-              style={{ padding: '8px 20px', background: '#3f51b5', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+              className="admin-sessions-action-button"
+              onClick={() =>
+                setCourts((current) => [
+                  ...current,
+                  { name: '', start_time: '19:00', end_time: '22:00', max_players: '6', total_cost: '' },
+                ])
+              }
+              type="button"
             >
-              Create
+              + Add court
+            </button>
+          </div>
+
+          <div className="admin-session-courts">
+            {courts.map((court, index) => (
+              <div className="admin-court-block" key={index}>
+                <div className="admin-court-block-header">
+                  <div>
+                    <div className="admin-session-form-label">Court {index + 1}</div>
+                    <div className="admin-court-block-title">Schedule and capacity</div>
+                  </div>
+                  <button
+                    className="admin-sessions-delete-button"
+                    onClick={() => {
+                      if (courts.length === 1) {
+                        setError('At least one court is required.')
+                        return
+                      }
+
+                      setError(null)
+                      setCourts((current) => current.filter((_, courtIndex) => courtIndex !== index))
+                    }}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div className="admin-court-block-fields">
+                  <label className="admin-session-field">
+                    <span>Court name</span>
+                    <input
+                      onChange={(event) => updateCourt(index, 'name', event.target.value)}
+                      placeholder="Court name"
+                      value={court.name}
+                    />
+                  </label>
+                  <label className="admin-session-field">
+                    <span>Start time</span>
+                    <input
+                      onChange={(event) => updateCourt(index, 'start_time', event.target.value)}
+                      type="time"
+                      value={court.start_time}
+                    />
+                  </label>
+                  <label className="admin-session-field">
+                    <span>End time</span>
+                    <input
+                      onChange={(event) => updateCourt(index, 'end_time', event.target.value)}
+                      type="time"
+                      value={court.end_time}
+                    />
+                  </label>
+                  <label className="admin-session-field">
+                    <span>Max spots</span>
+                    <input
+                      min="1"
+                      onChange={(event) => updateCourt(index, 'max_players', event.target.value)}
+                      placeholder="Max spots"
+                      type="number"
+                      value={court.max_players}
+                    />
+                  </label>
+                  <label className="admin-session-field">
+                    <span>Total cost</span>
+                    <input
+                      onChange={(event) => updateCourt(index, 'total_cost', event.target.value)}
+                      placeholder="Cost $"
+                      type="number"
+                      value={court.total_cost}
+                    />
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="admin-session-form-actions">
+            <button className="admin-sessions-primary-button" type="submit">
+              Create session
             </button>
             <button
-              type="button"
+              className="admin-sessions-action-button"
               onClick={() => setShowForm(false)}
-              style={{ padding: '8px 20px', background: 'white', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer' }}
+              type="button"
             >
               Cancel
             </button>
@@ -312,67 +340,165 @@ export default function AdminSessionList() {
         </form>
       ) : null}
 
-      <div style={{ border: '1px solid #e0e0e0', borderRadius: 8, overflow: 'hidden' }}>
-        {sessions.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', color: '#aaa' }}>No sessions yet</div>
+      {error && !showForm ? <div className="admin-sessions-inline-error">{error}</div> : null}
+
+      <div className="admin-session-list">
+        {upcomingSessions.length === 0 ? (
+          <div className="admin-session-empty-state">No sessions yet</div>
         ) : null}
-        {sessions.map((session) => (
-          <Fragment key={session.id}>
-            <div
-              onClick={() => void handleRowClick(session)}
-              onMouseEnter={() => setHoveredId(session.id)}
-              onMouseLeave={() => setHoveredId(null)}
-              style={{
-                padding: '14px 16px',
-                borderBottom: expandedId === session.id ? '1px solid #c5cae9' : '1px solid #f0f0f0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: rowBackground(session.id),
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: expandedId === session.id ? '#3f51b5' : '#ccc', fontSize: 11 }}>
-                  {expandedId === session.id ? '▾' : '▸'}
-                </span>
-                <div>
-                  <Link
-                    to={`/admin/sessions/${session.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ color: '#3f51b5', textDecoration: 'none', fontWeight: 600 }}
-                  >
-                    {session.name}
-                  </Link>
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{session.date}</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {session.is_active ? (
-                  <span
-                    style={{ background: '#e8f5e9', color: '#2e7d32', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}
-                  >
-                    Active
-                  </span>
-                ) : null}
+
+        {upcomingSessions.map((session) => {
+          const isExpanded = expandedId === session.id
+
+          return (
+            <Fragment key={session.id}>
+              <article className={`admin-session-card${isExpanded ? ' is-expanded' : ''}`}>
                 <button
-                  onClick={(e) => { e.stopPropagation(); void handleDelete(session) }}
-                  style={{ padding: '6px 12px', background: 'white', border: '1px solid #ffcdd2', borderRadius: 4, cursor: 'pointer', fontSize: 12, color: '#c62828' }}
+                  className="admin-session-card-main"
+                  onClick={() => void handleRowClick(session)}
+                  type="button"
                 >
-                  Delete
+                  <div className="admin-session-card-top">
+                    <span className="admin-session-card-chevron" aria-hidden="true">
+                      {isExpanded ? '▾' : '▸'}
+                    </span>
+                    <span className={`admin-session-card-status${session.is_active ? ' is-active' : ''}`}>
+                      {session.is_active ? 'Active' : 'Draft'}
+                    </span>
+                  </div>
+
+                  <div className="admin-session-card-copy">
+                    <div className="admin-session-card-name">{session.name}</div>
+                    <div className="admin-session-card-date">{session.date}</div>
+                  </div>
+
+                  <div className="admin-session-card-stats">
+                    <div className="admin-session-card-stat">
+                      <span className="admin-session-card-stat-label">Cancel window</span>
+                      <strong>{formatCancelWindow(session.cancel_window_hours)}</strong>
+                    </div>
+                    <div className="admin-session-card-stat">
+                      <span className="admin-session-card-stat-label">Details</span>
+                      <strong>{isExpanded ? 'Open' : 'Closed'}</strong>
+                    </div>
+                  </div>
                 </button>
-              </div>
-            </div>
-            {expandedId === session.id && expandedData ? (
-              <div style={{ background: '#f8f9ff', borderBottom: '2px solid #c5cae9', padding: 16 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 24 }}>
-                  <CostCalculator data={expandedData} onRefresh={() => void handleExpandedRefresh()} />
-                  <RosterManager signups={expandedData.signups} onRefresh={() => void handleExpandedRefresh()} />
+
+                <div className="admin-session-card-actions">
+                  <Link
+                    className="admin-session-card-link"
+                    onClick={(event) => event.stopPropagation()}
+                    to={`/admin/sessions/${session.id}`}
+                  >
+                    Open details
+                  </Link>
+                  <button
+                    className="admin-sessions-delete-button"
+                    onClick={() => void handleDelete(session)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
                 </div>
-              </div>
-            ) : null}
-          </Fragment>
-        ))}
+              </article>
+
+              {isExpanded && expandedData ? (
+                <div className="admin-session-expanded">
+                  <div className="admin-session-expanded-grid">
+                    <CostCalculator data={expandedData} onRefresh={() => void handleExpandedRefresh()} />
+                    <RosterManager
+                      onRefresh={() => void handleExpandedRefresh()}
+                      signups={expandedData.signups}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </Fragment>
+          )
+        })}
+      </div>
+
+      <section className="admin-sessions-toolbar">
+        <div>
+          <div className="admin-sessions-toolbar-label">History</div>
+          <h2 className="admin-sessions-toolbar-title">Past sessions</h2>
+        </div>
+      </section>
+
+      <div className="admin-session-list admin-past-session-list">
+        {pastSessions.length === 0 ? (
+          <div className="admin-session-empty-state">No past sessions</div>
+        ) : null}
+
+        {pastSessions.map((session) => {
+          const isExpanded = expandedId === session.id
+
+          return (
+            <Fragment key={session.id}>
+              <article className={`admin-session-card${isExpanded ? ' is-expanded' : ''}`}>
+                <button
+                  className="admin-session-card-main"
+                  onClick={() => void handleRowClick(session)}
+                  type="button"
+                >
+                  <div className="admin-session-card-top">
+                    <span className="admin-session-card-chevron" aria-hidden="true">
+                      {isExpanded ? '▾' : '▸'}
+                    </span>
+                    <span className={`admin-session-card-status${session.is_active ? ' is-active' : ''}`}>
+                      {session.is_active ? 'Active' : 'Draft'}
+                    </span>
+                  </div>
+
+                  <div className="admin-session-card-copy">
+                    <div className="admin-session-card-name">{session.name}</div>
+                    <div className="admin-session-card-date">{session.date}</div>
+                  </div>
+
+                  <div className="admin-session-card-stats">
+                    <div className="admin-session-card-stat">
+                      <span className="admin-session-card-stat-label">Cancel window</span>
+                      <strong>{formatCancelWindow(session.cancel_window_hours)}</strong>
+                    </div>
+                    <div className="admin-session-card-stat">
+                      <span className="admin-session-card-stat-label">Details</span>
+                      <strong>{isExpanded ? 'Open' : 'Closed'}</strong>
+                    </div>
+                  </div>
+                </button>
+
+                <div className="admin-session-card-actions">
+                  <Link
+                    className="admin-session-card-link"
+                    onClick={(event) => event.stopPropagation()}
+                    to={`/admin/sessions/${session.id}`}
+                  >
+                    Open details
+                  </Link>
+                  <button
+                    className="admin-sessions-delete-button"
+                    onClick={() => void handleDelete(session)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
+
+              {isExpanded && expandedData ? (
+                <div className="admin-session-expanded">
+                  <div className="admin-session-expanded-grid">
+                    <CostCalculator data={expandedData} onRefresh={() => void handleExpandedRefresh()} />
+                    <RosterManager
+                      onRefresh={() => void handleExpandedRefresh()}
+                      signups={expandedData.signups}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </Fragment>
+          )
+        })}
       </div>
     </div>
   )
