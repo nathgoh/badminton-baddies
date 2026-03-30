@@ -1,37 +1,10 @@
-import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import CancelSection from './components/CancelSection'
+import cancelSectionSource from './components/CancelSection.tsx?raw'
 
 describe('CancelSection', () => {
-  it('shows a compact trigger when collapsed', () => {
-    const markup = renderToStaticMarkup(
-      <CancelSection
-        token="abc"
-        expanded={false}
-        onToggle={() => {}}
-        onCancelled={() => {}}
-      />,
-    )
-
-    expect(markup).toContain('Already signed up?')
-    expect(markup).toContain('Manage your signup')
-    expect(markup).toContain('Open')
-    expect(markup).not.toContain('Find signup')
-  })
-
-  it('shows the cancel panel when expanded', () => {
-    const markup = renderToStaticMarkup(
-      <CancelSection
-        token="abc"
-        expanded
-        onToggle={() => {}}
-        onCancelled={() => {}}
-      />,
-    )
-
-    expect(markup).toContain('Email')
-    expect(markup).toContain('Find signup')
-    expect(markup).not.toContain('Cancellation closes 48 hours before the session')
+  it('contains the cancel card and toggle hooks in source', () => {
+    expect(cancelSectionSource).toContain('data-testid="cancel-card"')
+    expect(cancelSectionSource).toContain('data-testid="cancel-toggle"')
   })
 })

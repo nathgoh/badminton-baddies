@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import CourtCards from './components/CourtCards'
+import signupPageSource from './pages/SignupPage.tsx?raw'
 import type { Court } from './types'
 
 function court(id: string): Court {
@@ -60,5 +61,11 @@ describe('CourtCards', () => {
     expect(markup).not.toContain('public-signup-summary-value')
 
     vi.useRealTimers()
+  })
+
+  it('includes public shell hooks in SignupPage source', () => {
+    expect(signupPageSource).toContain('data-testid="public-shell"')
+    expect(signupPageSource).toContain('data-testid="public-hero"')
+    expect(signupPageSource).toContain('data-testid="public-tab-bar"')
   })
 })
