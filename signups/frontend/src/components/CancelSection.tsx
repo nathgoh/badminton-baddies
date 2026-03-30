@@ -91,11 +91,11 @@ export default function CancelSection({ token, expanded, onToggle, onCancelled }
               )}
             </div>
           ) : null}
-          <div style={{ fontSize: 11, color: '#aaa' }}>
-            Cancellation closes 48 hours before the session
-          </div>
         </div>
       ) : null}
+      <div style={{ fontSize: 11, color: '#aaa', marginTop: 8 }}>
+        Cancellation closes 48 hours before the session
+      </div>
     </div>
   )
 }
