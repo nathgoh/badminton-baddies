@@ -1,36 +1,43 @@
 import type { Court } from '../types'
-import { formatTime } from '../utils'
+import { formatCancellationStatus, formatTime } from '../utils'
 
 interface Props {
   courts: Court[]
   confirmedCount: number
   waitlistCount: number
   totalCapacity: number
+  sessionDate: string
+  cancelWindowHours: number
 }
 
 export default function CourtCards({
   courts,
   confirmedCount,
-  waitlistCount,
+  waitlistCount: _waitlistCount,
   totalCapacity,
+  sessionDate,
+  cancelWindowHours,
 }: Props) {
   const isFull = confirmedCount >= totalCapacity
-  const totalSpotsLabel = isFull
-    ? `Full${waitlistCount > 0 ? ` · ${waitlistCount} waitlist` : ''}`
-    : `${totalCapacity - confirmedCount} spot${
-        totalCapacity - confirmedCount === 1 ? '' : 's'
-      } left before waitlist`
+  const remainingSpots = totalCapacity - confirmedCount
+  const summaryValue = isFull
+    ? null
+    : `${remainingSpots} spot${remainingSpots === 1 ? '' : 's'} left before waitlist`
+  const cancellationStatus = formatCancellationStatus(sessionDate, cancelWindowHours)
 
   return (
     <section className="public-signup-summary">
       <div className="public-signup-summary-header">
         <div>
           <div className="public-signup-summary-label">Session Summary</div>
-          <div className="public-signup-summary-value">{totalSpotsLabel}</div>
         </div>
         <div className={`public-signup-summary-status ${isFull ? 'is-full' : 'is-open'}`}>
           {isFull ? 'Full' : 'Open'}
         </div>
+      </div>
+      <div className="public-signup-summary-body">
+        {summaryValue ? <div className="public-signup-summary-value">{summaryValue}</div> : null}
+        <div className="public-signup-summary-meta">{cancellationStatus}</div>
       </div>
       <div className="public-signup-courts-label">Courts</div>
       <div className="public-signup-courts-list">

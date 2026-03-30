@@ -252,6 +252,18 @@ textarea {
   color: #1f294a;
 }
 
+.public-signup-summary-body {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.public-signup-summary-meta {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #6b74a8;
+}
+
 .public-roster-name-waitlist {
   color: #3b2a12;
 }

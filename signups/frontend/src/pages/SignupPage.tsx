@@ -100,6 +100,8 @@ export default function SignupPage() {
             confirmedCount={confirmed_count}
             waitlistCount={waitlist_count}
             totalCapacity={total_capacity}
+            sessionDate={session.date}
+            cancelWindowHours={session.cancel_window_hours}
           />
           <CancelSection
             token={token!}
