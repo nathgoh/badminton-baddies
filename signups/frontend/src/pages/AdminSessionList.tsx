@@ -150,7 +150,7 @@ export default function AdminSessionList() {
             Players
           </button>
           <button
-            onClick={logout}
+            onClick={() => { logout(); navigate('/admin/login') }}
             style={{ padding: '8px 16px', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', background: 'white' }}
           >
             Sign out
