@@ -5,11 +5,13 @@ import CostCalculator from '../components/CostCalculator'
 import RosterManager from '../components/RosterManager'
 import { getAdminSession } from '../api/client'
 import type { AdminSessionResponse } from '../types'
+import { useMobile } from '../hooks/useMobile'
 
 export default function AdminSessionDetail() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<AdminSessionResponse | null>(null)
   const navigate = useNavigate()
+  const isMobile = useMobile()
 
   async function load() {
     if (!id) {
@@ -42,7 +44,7 @@ export default function AdminSessionDetail() {
         ← Back to sessions
       </button>
       <h2 style={{ margin: '0 0 20px' }}>{data.session.name}</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 24 }}>
         <CostCalculator data={data} onRefresh={() => void load()} />
         <RosterManager signups={data.signups} onRefresh={() => void load()} />
       </div>
