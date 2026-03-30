@@ -101,10 +101,23 @@ def calculate_costs(
             detail="No confirmed players to calculate costs for",
         )
     total_cost = sum(court.total_cost for court in courts)
-    base_amount = round(total_cost / len(confirmed), 2)
-    for signup in confirmed:
-        if not signup.amount_adjusted:
-            storage.update_signup(signup.id, SignupUpdate(amount_owed=base_amount))
+
+    adjusted = [s for s in confirmed if s.amount_adjusted and s.amount_owed is not None]
+    unadjusted = [s for s in confirmed if not s.amount_adjusted]
+    adjusted_total = sum(s.amount_owed for s in adjusted)
+
+    if not unadjusted:
+        if round(adjusted_total, 2) != round(total_cost, 2):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Adjusted amounts (${adjusted_total:.2f}) do not sum to total cost (${total_cost:.2f})",
+            )
+        return CostCalculationResult(total_cost=total_cost, confirmed_count=len(confirmed), base_amount=0.0)
+
+    remaining = total_cost - adjusted_total
+    base_amount = round(remaining / len(unadjusted), 2)
+    for signup in unadjusted:
+        storage.update_signup(signup.id, SignupUpdate(amount_owed=base_amount))
     return CostCalculationResult(
         total_cost=total_cost,
         confirmed_count=len(confirmed),
