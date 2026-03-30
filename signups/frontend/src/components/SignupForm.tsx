@@ -94,10 +94,10 @@ export default function SignupForm({ token, isActive, isFull, onSuccess }: Props
           onChange={(event) => setVenmo(event.target.value)}
         />
       </label>
-      <label className="public-signup-checkbox" htmlFor="payment-agree">
+      <label className="public-signup-checkbox">
         <input
-          id="payment-agree"
           type="checkbox"
+          tabIndex={0}
           checked={agreed}
           onChange={(event) => setAgreed(event.target.checked)}
         />

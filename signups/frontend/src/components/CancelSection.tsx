@@ -59,27 +59,36 @@ export default function CancelSection({ token, expanded, onToggle, onCancelled }
         aria-controls={detailsId}
         onClick={onToggle}
       >
-        <span>Already signed up? Cancel your spot</span>
-        <span>{expanded ? 'Hide' : 'Open'}</span>
+        <span className="public-signup-cancel-trigger-copy">
+          <span className="public-signup-cancel-trigger-title">Already signed up?</span>
+          <span className="public-signup-cancel-trigger-subtitle">Manage your signup</span>
+        </span>
+        <span className="public-signup-cancel-trigger-action">{expanded ? 'Hide' : 'Open'}</span>
       </button>
       {expanded ? (
-        <div id={detailsId} className="public-signup-form">
-          <div className="public-signup-field">
-            <label htmlFor={emailInputId}>Email</label>
-            <input
-              id={emailInputId}
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
+        <div id={detailsId} className="public-signup-cancel-details">
+          <div className="public-signup-cancel-controls">
+            <div className="public-signup-field">
+              <label htmlFor={emailInputId}>Email</label>
+              <input
+                id={emailInputId}
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              className="public-signup-secondary-button public-signup-cancel-lookup"
+              onClick={handleLookup}
+            >
+              Find signup
+            </button>
           </div>
-          <button type="button" className="public-signup-secondary-button" onClick={handleLookup}>
-            Look up my signup
-          </button>
-          {error ? <div style={{ color: '#c62828', fontSize: 12 }}>{error}</div> : null}
+          {error ? <div className="public-signup-inline-error">{error}</div> : null}
           {lookup ? (
-            <div style={{ marginTop: 10, fontSize: 13 }}>
+            <div className="public-signup-cancel-result">
               <div>
                 Found: <strong>{lookup.signup.name}</strong> - <em>{lookup.signup.status}</em>
               </div>
@@ -88,13 +97,12 @@ export default function CancelSection({ token, expanded, onToggle, onCancelled }
                   type="button"
                   onClick={handleCancel}
                   disabled={loading}
-                  className="public-signup-danger-button"
-                  style={{ marginTop: 8 }}
+                  className="public-signup-danger-button public-signup-cancel-confirm"
                 >
                   {loading ? 'Cancelling...' : 'Cancel my spot'}
                 </button>
               ) : (
-                <div style={{ color: '#888', fontSize: 12, marginTop: 6 }}>{lookup.reason}</div>
+                <div className="public-signup-cancel-reason">{lookup.reason}</div>
               )}
             </div>
           ) : null}

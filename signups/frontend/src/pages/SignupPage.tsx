@@ -6,6 +6,7 @@ import CancelSection from '../components/CancelSection'
 import RosterTab from '../components/RosterTab'
 import SignupForm from '../components/SignupForm'
 import { getPublicSession } from '../api/client'
+import { formatDisplayDate } from '../utils'
 import type { PublicSessionResponse, Signup } from '../types'
 
 type Tab = 'signup' | 'roster'
@@ -59,6 +60,7 @@ export default function SignupPage() {
   const { session, courts, signups, confirmed_count, waitlist_count, total_capacity } = data
   const totalSignups = confirmed_count + waitlist_count
   const chipLabel = sessionChipLabel(session.name, session.date)
+  const displayDate = formatDisplayDate(session.date)
 
   return (
     <div className="public-signup-page">
@@ -67,7 +69,7 @@ export default function SignupPage() {
           <div className="public-signup-session-meta">
             <div className="public-signup-session-chip">{chipLabel}</div>
             <div className="public-signup-session-name">{session.name}</div>
-            <div className="public-signup-session-date">{session.date}</div>
+            <div className="public-signup-session-date">{displayDate}</div>
           </div>
           <div className="public-signup-availability-card">
             <div className="public-signup-availability-label">Availability</div>
