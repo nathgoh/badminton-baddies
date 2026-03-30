@@ -10,6 +10,7 @@ import type { AdminSessionResponse } from '../types'
 export default function AdminSessionDetail() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<AdminSessionResponse | null>(null)
+  const [toggling, setToggling] = useState(false)
   const [calculating, setCalculating] = useState(false)
   const [result, setResult] = useState<{ base_amount: number } | null>(null)
 
@@ -26,8 +27,15 @@ export default function AdminSessionDetail() {
 
   async function handleToggleActive() {
     if (!data) return
-    await updateSession(data.session.id, { is_active: !data.session.is_active })
-    void load()
+    setToggling(true)
+    try {
+      await updateSession(data.session.id, { is_active: !data.session.is_active })
+      void load()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      setToggling(false)
+    }
   }
 
   async function handleCalculate() {
@@ -116,8 +124,8 @@ export default function AdminSessionDetail() {
               ) : null}
             </div>
             <div className="admin-session-controls-actions">
-              <button type="button" className="admin-session-toggle-button" onClick={() => void handleToggleActive()}>
-                {data.session.is_active ? 'Close session' : 'Open session'}
+              <button type="button" className="admin-session-toggle-button" onClick={() => void handleToggleActive()} disabled={toggling}>
+                {toggling ? 'Saving...' : data.session.is_active ? 'Close session' : 'Open session'}
               </button>
               <button type="button" className="admin-session-calculate-button" onClick={() => void handleCalculate()} disabled={calculating}>
                 {calculating ? 'Calculating...' : 'Calculate & assign costs'}
