@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatTime, nextExpandedId } from './utils'
+import { formatCancellationStatus, formatDisplayDate, formatTime, nextExpandedId } from './utils'
 
 describe('formatTime', () => {
   it('formats a whole PM hour without minutes', () => {
@@ -42,5 +42,29 @@ describe('nextExpandedId', () => {
 
   it('returns null when clicking the already-expanded session (collapse)', () => {
     expect(nextExpandedId('abc', 'abc')).toBeNull()
+  })
+})
+
+describe('formatDisplayDate', () => {
+  it('formats an ISO date as Month DD, YYYY', () => {
+    expect(formatDisplayDate('2026-04-16')).toBe('April 16, 2026')
+  })
+
+  it('returns the original value when the date is invalid', () => {
+    expect(formatDisplayDate('not-a-date')).toBe('not-a-date')
+  })
+})
+
+describe('formatCancellationStatus', () => {
+  it('returns remaining time before the cancellation cutoff', () => {
+    expect(
+      formatCancellationStatus('2026-04-16', 48, new Date('2026-04-13T18:00:00Z')),
+    ).toBe('Cancellation closes in 14h')
+  })
+
+  it('returns closed when the cancellation cutoff has passed', () => {
+    expect(
+      formatCancellationStatus('2026-04-16', 48, new Date('2026-04-14T01:00:00Z')),
+    ).toBe('Cancellation closed')
   })
 })
