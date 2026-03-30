@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 import { cancelSignup, lookupCancel } from '../api/client'
 import type { CancelLookupResponse } from '../types'
@@ -15,6 +15,8 @@ function errorMessage(error: unknown) {
 }
 
 export default function CancelSection({ token, expanded, onToggle, onCancelled }: Props) {
+  const emailInputId = useId()
+  const detailsId = useId()
   const [email, setEmail] = useState('')
   const [lookup, setLookup] = useState<CancelLookupResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -54,19 +56,24 @@ export default function CancelSection({ token, expanded, onToggle, onCancelled }
         type="button"
         className="public-signup-cancel-trigger"
         aria-expanded={expanded}
+        aria-controls={detailsId}
         onClick={onToggle}
       >
         <span>Already signed up? Cancel your spot</span>
         <span>{expanded ? 'Hide' : 'Open'}</span>
       </button>
       {expanded ? (
-        <div className="public-signup-form">
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
+        <div id={detailsId} className="public-signup-form">
+          <div className="public-signup-field">
+            <label htmlFor={emailInputId}>Email</label>
+            <input
+              id={emailInputId}
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </div>
           <button type="button" className="public-signup-secondary-button" onClick={handleLookup}>
             Look up my signup
           </button>

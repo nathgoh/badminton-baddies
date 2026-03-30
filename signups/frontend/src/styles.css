@@ -158,7 +158,7 @@ textarea {
   color: #2c3a95;
 }
 
-.public-signup-tab[aria-selected='true'] {
+.public-signup-tab[aria-pressed='true'] {
   color: #24328f;
   border-bottom-color: #4b57d2;
 }

@@ -10,6 +10,21 @@ import type { PublicSessionResponse, Signup } from '../types'
 
 type Tab = 'signup' | 'roster'
 
+function sessionChipLabel(sessionName: string, sessionDate: string) {
+  const [year, month, day] = sessionDate.split('-').map(Number)
+
+  if ([year, month, day].every(Number.isInteger)) {
+    const weekday = new Intl.DateTimeFormat(undefined, {
+      weekday: 'long',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(year, month - 1, day)))
+
+    return `${weekday} Session`
+  }
+
+  return sessionName || 'Session'
+}
+
 export default function SignupPage() {
   const { token } = useParams<{ token: string }>()
   const [data, setData] = useState<PublicSessionResponse | null>(null)
@@ -43,13 +58,14 @@ export default function SignupPage() {
 
   const { session, courts, signups, confirmed_count, waitlist_count, total_capacity } = data
   const totalSignups = confirmed_count + waitlist_count
+  const chipLabel = sessionChipLabel(session.name, session.date)
 
   return (
     <div className="public-signup-page">
       <div className="public-signup-hero">
         <div className="public-signup-hero-top">
           <div className="public-signup-session-meta">
-            <div className="public-signup-session-chip">Thursday Session</div>
+            <div className="public-signup-session-chip">{chipLabel}</div>
             <div className="public-signup-session-name">{session.name}</div>
             <div className="public-signup-session-date">{session.date}</div>
           </div>
@@ -63,15 +79,14 @@ export default function SignupPage() {
         </div>
       </div>
 
-      <div className="public-signup-tabs" role="tablist" aria-label="Signup page sections">
+      <div className="public-signup-tabs" aria-label="Signup page sections">
         {(['signup', 'roster'] as Tab[]).map((currentTab) => (
           <button
             key={currentTab}
             onClick={() => setTab(currentTab)}
             className="public-signup-tab"
             type="button"
-            role="tab"
-            aria-selected={tab === currentTab}
+            aria-pressed={tab === currentTab}
           >
             {currentTab === 'signup' ? 'Sign Up' : `Roster (${totalSignups})`}
           </button>
