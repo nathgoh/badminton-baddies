@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatTime } from './utils'
+import { formatTime, nextExpandedId } from './utils'
 
 describe('formatTime', () => {
   it('formats a whole PM hour without minutes', () => {
@@ -28,5 +28,19 @@ describe('formatTime', () => {
 
   it('formats 10PM correctly', () => {
     expect(formatTime('22:00')).toBe('10PM')
+  })
+})
+
+describe('nextExpandedId', () => {
+  it('returns the clicked id when nothing is expanded', () => {
+    expect(nextExpandedId(null, 'abc')).toBe('abc')
+  })
+
+  it('returns the clicked id when a different session is expanded', () => {
+    expect(nextExpandedId('abc', 'xyz')).toBe('xyz')
+  })
+
+  it('returns null when clicking the already-expanded session (collapse)', () => {
+    expect(nextExpandedId('abc', 'abc')).toBeNull()
   })
 })

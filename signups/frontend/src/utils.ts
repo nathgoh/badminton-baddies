@@ -7,3 +7,10 @@ export function formatTime(time: string): string {
   const hour12 = hour % 12 === 0 ? 12 : hour % 12
   return minute === 0 ? `${hour12}${suffix}` : `${hour12}:${minuteStr}${suffix}`
 }
+
+/** Returns the next expanded session ID for an accordion toggle.
+ *  Clicking the already-expanded session collapses it (returns null).
+ *  Clicking a different session expands it (returns its id). */
+export function nextExpandedId(currentId: string | null, clickedId: string): string | null {
+  return currentId === clickedId ? null : clickedId
+}
