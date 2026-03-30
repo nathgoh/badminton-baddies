@@ -50,12 +50,17 @@ Keep the existing single-page signup and roster structure, but redesign the publ
 
 - Replace the current standalone court card grid with a summary card.
 - Keep session availability in the summary card using concise status language such as `1 spot left before waitlist`.
+- When the session is full, do not repeat the word `Full` in the main summary text if a `Full` status pill is already shown on the right.
 - Present courts as low-emphasis rows under a `Courts` label.
 - Each court row should show:
   - court name
   - time range
   - capacity label using `spots`, not `players`
 - Courts should read as informational metadata, not interactive selections.
+- Add a secondary session-summary meta line for the cancellation window:
+  - before the cutoff: `Cancellation closes in ...`
+  - after the cutoff: `Cancellation closed`
+- This cancellation status should live in the summary card rather than in the cancel utility section.
 
 ### Signup Form
 
@@ -77,7 +82,7 @@ Keep the existing single-page signup and roster structure, but redesign the publ
 - Use that utility row to expand or reveal the cancel controls inline.
 - Keep the cancel form secondary in emphasis to signup.
 - Preserve current lookup, error, and cancellation behaviors.
-- Preserve the cancellation deadline helper text.
+- Remove the old static helper text (`Cancellation closes 48 hours before the session`) from the cancel utility section, since that information is now surfaced in the summary card as a live cancellation-status line.
 
 ## Error Handling
 
