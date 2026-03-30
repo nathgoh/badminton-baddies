@@ -9,12 +9,6 @@ import { getPublicSession } from '../api/client'
 import type { PublicSessionResponse, Signup } from '../types'
 
 type Tab = 'signup' | 'roster'
-type CancelSectionCompatProps = {
-  token: string
-  expanded: boolean
-  onToggle: () => void
-  onCancelled: () => void
-}
 
 export default function SignupPage() {
   const { token } = useParams<{ token: string }>()
@@ -23,8 +17,6 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [successSignup, setSuccessSignup] = useState<Signup | null>(null)
   const [showCancelSection, setShowCancelSection] = useState(false)
-
-  const CompatCancelSection = CancelSection as unknown as (props: CancelSectionCompatProps) => JSX.Element
 
   async function load() {
     if (!token) {
@@ -94,7 +86,7 @@ export default function SignupPage() {
             waitlistCount={waitlist_count}
             totalCapacity={total_capacity}
           />
-          <CompatCancelSection
+          <CancelSection
             token={token!}
             expanded={showCancelSection}
             onToggle={() => setShowCancelSection((value) => !value)}

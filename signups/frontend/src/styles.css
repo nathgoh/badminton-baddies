@@ -358,6 +358,7 @@ textarea {
   font-weight: 700;
 }
 
+.public-signup-success,
 .public-signup-status-banner {
   padding: 16px 18px;
   border-radius: 16px;
