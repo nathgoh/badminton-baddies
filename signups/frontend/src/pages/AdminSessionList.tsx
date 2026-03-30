@@ -59,15 +59,23 @@ export default function AdminSessionList() {
       setExpandedId(null)
       setExpandedData(null)
     } else {
-      const data = await getAdminSession(session.id)
-      setExpandedId(session.id)
-      setExpandedData(data)
+      try {
+        const data = await getAdminSession(session.id)
+        setExpandedId(session.id)
+        setExpandedData(data)
+      } catch (caughtError) {
+        setError(errorMessage(caughtError))
+      }
     }
   }
 
   async function handleExpandedRefresh() {
     if (!expandedId) return
-    setExpandedData(await getAdminSession(expandedId))
+    try {
+      setExpandedData(await getAdminSession(expandedId))
+    } catch (caughtError) {
+      setError(errorMessage(caughtError))
+    }
   }
 
   async function handleCreate(event: React.FormEvent) {
@@ -108,6 +116,7 @@ export default function AdminSessionList() {
       setExpandedId(null)
       setExpandedData(null)
     }
+    setHoveredId(null)
     await load()
   }
 
