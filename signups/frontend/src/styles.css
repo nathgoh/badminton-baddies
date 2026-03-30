@@ -259,7 +259,7 @@ textarea {
 
 .public-signup-courts-list {
   display: grid;
-  gap: 8px;
+  gap: 0;
 }
 
 .public-signup-court-row {
@@ -267,13 +267,16 @@ textarea {
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: #f7f9ff;
-  border: 1px solid #e6ebff;
-  color: #5f6897;
-  font-size: 0.92rem;
+  padding: 8px 0;
+  border-top: 1px solid #edf1fb;
+  color: #6b74a8;
+  font-size: 0.9rem;
   line-height: 1.35;
+}
+
+.public-signup-court-row:first-child {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .public-signup-court-row strong {
@@ -283,8 +286,8 @@ textarea {
 
 .public-signup-court-row span:last-child {
   white-space: nowrap;
-  color: #6b74a8;
-  font-weight: 600;
+  color: #8a93bd;
+  font-weight: 500;
 }
 
 .public-signup-form-card,
@@ -492,6 +495,11 @@ textarea {
   .public-signup-court-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .public-signup-court-row {
+    gap: 4px;
+    padding: 10px 0;
   }
 
   .public-signup-court-row span:last-child {
