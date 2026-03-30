@@ -21,6 +21,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   })
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      localStorage.removeItem('admin_jwt')
+      localStorage.removeItem('admin_email')
+      window.location.href = '/admin/login'
+    }
     const body = await response.json().catch(() => ({}))
     throw new Error(body.detail ?? `HTTP ${response.status}`)
   }
