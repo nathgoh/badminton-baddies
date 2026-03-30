@@ -142,3 +142,21 @@ def test_list_players(client, storage):
 
     assert response.status_code == 200
     assert len(response.json()) == 1
+
+
+def test_admin_cancel_promotes_from_waitlist(client):
+    session = _setup(client)  # capacity = 4 (2 courts × 2 players each)
+    token = session["access_token"]
+    _signup(client, token, "a@t.com", "Alice")
+    _signup(client, token, "b@t.com", "Bob")
+    _signup(client, token, "c@t.com", "Carol")
+    bob_signup = _signup(client, token, "b2@t.com", "Bob2").json()
+    dan = _signup(client, token, "d@t.com", "Dan").json()
+    assert dan["status"] == "waitlist"
+
+    client.delete(f"/api/admin/signups/{bob_signup['id']}")
+
+    response = client.get(f"/api/admin/sessions/{session['id']}")
+    signups = response.json()["signups"]
+    dan_after = next(s for s in signups if s["email"] == "d@t.com")
+    assert dan_after["status"] == "confirmed"

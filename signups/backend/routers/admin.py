@@ -19,6 +19,7 @@ try:
         SignupUpdate,
     )
     from ..storage.adapter import StorageAdapter
+    from .signups import _promote_next_from_waitlist
 except ImportError:
     from dependencies import get_storage
     from models import (
@@ -33,6 +34,7 @@ except ImportError:
         SignupUpdate,
     )
     from storage.adapter import StorageAdapter
+    from routers.signups import _promote_next_from_waitlist
 
 
 router = APIRouter(prefix="/admin")
@@ -150,10 +152,12 @@ def promote_from_waitlist(signup_id: str, storage: StorageAdapter = Depends(get_
 @router.delete("/signups/{signup_id}", response_model=Signup)
 def cancel_signup(signup_id: str, storage: StorageAdapter = Depends(get_storage)) -> Signup:
     try:
-        return storage.update_signup(
+        cancelled = storage.update_signup(
             signup_id,
             SignupUpdate(status=SignupStatus.cancelled, cancelled_at=datetime.now(timezone.utc)),
         )
+        _promote_next_from_waitlist(cancelled.session_id, storage)
+        return cancelled
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signup not found") from exc
 
