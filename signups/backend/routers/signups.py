@@ -53,6 +53,20 @@ def _cancellation_cutoff(session_datetime_date, cancel_window_hours: int) -> dat
     return session_start - timedelta(hours=cancel_window_hours)
 
 
+def _promote_next_from_waitlist(session_id: str, storage: StorageAdapter) -> None:
+    courts = storage.get_courts(session_id)
+    total_capacity = sum(court.max_players for court in courts)
+    signups = storage.get_signups(session_id)
+    confirmed_count = sum(1 for s in signups if s.status == SignupStatus.confirmed)
+    if confirmed_count < total_capacity:
+        waitlisted = sorted(
+            [s for s in signups if s.status == SignupStatus.waitlist],
+            key=lambda s: s.timestamp,
+        )
+        if waitlisted:
+            storage.update_signup(waitlisted[0].id, SignupUpdate(status=SignupStatus.confirmed))
+
+
 @router.get("/public/{token}", response_model=PublicSessionResponse)
 def get_public_session(token: str, storage: StorageAdapter = Depends(get_storage)) -> PublicSessionResponse:
     session = _get_session_or_404(token, storage)
@@ -161,7 +175,9 @@ def cancel_signup(
     if datetime.now(timezone.utc) >= _cancellation_cutoff(session.date, session.cancel_window_hours):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancellation window has closed")
 
-    return storage.update_signup(
+    cancelled = storage.update_signup(
         signup.id,
         SignupUpdate(status=SignupStatus.cancelled, cancelled_at=datetime.now(timezone.utc)),
     )
+    _promote_next_from_waitlist(session.id, storage)
+    return cancelled

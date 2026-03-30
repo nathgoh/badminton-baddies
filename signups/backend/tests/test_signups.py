@@ -167,3 +167,36 @@ def test_cancel_wrong_email_rejected(client):
     )
 
     assert response.status_code == 403
+
+
+def test_cancel_promotes_from_waitlist(client):
+    session = _make_session(client)  # capacity = 2
+    token = session["access_token"]
+    _signup(client, token, email="a@test.com", name="Alice")
+    bob = _signup(client, token, email="b@test.com", name="Bob").json()
+    carol = _signup(client, token, email="c@test.com", name="Carol").json()
+    assert carol["status"] == "waitlist"
+
+    client.post(
+        f"/api/public/{token}/cancel",
+        json={"signup_id": bob["id"], "email": "b@test.com"},
+    )
+
+    response = client.get(f"/api/public/{token}")
+    signups = response.json()["signups"]
+    carol_after = next(s for s in signups if s["email"] == "c@test.com")
+    assert carol_after["status"] == "confirmed"
+
+
+def test_cancel_with_no_waitlist_does_not_error(client):
+    session = _make_session(client)  # capacity = 2
+    token = session["access_token"]
+    alice = _signup(client, token, email="a@test.com", name="Alice").json()
+
+    response = client.post(
+        f"/api/public/{token}/cancel",
+        json={"signup_id": alice["id"], "email": "a@test.com"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
