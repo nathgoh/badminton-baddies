@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatCancellationStatus, formatDisplayDate, formatTime, nextExpandedId } from './utils'
+import { formatCancellationStatus, formatDisplayDate, formatTime, isPastSession, nextExpandedId } from './utils'
 
 describe('formatTime', () => {
   it('formats a whole PM hour without minutes', () => {
@@ -72,5 +72,19 @@ describe('formatCancellationStatus', () => {
     expect(
       formatCancellationStatus('2026-04-16', 48, new Date('2026-04-14T01:00:00Z')),
     ).toBe('Cancellation closed')
+  })
+})
+
+describe('isPastSession', () => {
+  it('returns true when the session date is before today', () => {
+    expect(isPastSession('2026-03-28', '2026-03-30')).toBe(true)
+  })
+
+  it('returns false when the session date is today', () => {
+    expect(isPastSession('2026-03-30', '2026-03-30')).toBe(false)
+  })
+
+  it('returns false when the session date is in the future', () => {
+    expect(isPastSession('2026-04-05', '2026-03-30')).toBe(false)
   })
 })

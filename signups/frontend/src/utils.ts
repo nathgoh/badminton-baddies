@@ -65,3 +65,10 @@ export function formatCancellationStatus(
 export function nextExpandedId(currentId: string | null, clickedId: string): string | null {
   return currentId === clickedId ? null : clickedId
 }
+
+/** Returns true if the session date (YYYY-MM-DD) is before today's date.
+ *  A session on today's date is NOT considered past.
+ *  Pass `today` explicitly in tests to avoid depending on the system clock. */
+export function isPastSession(date: string, today: string = new Date().toISOString().slice(0, 10)): boolean {
+  return date < today
+}
