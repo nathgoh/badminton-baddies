@@ -118,6 +118,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: signup.amount_adjusted ? '#e65100' : '#333' }}>
                     {signup.amount_owed != null ? `$${signup.amount_owed.toFixed(2)}` : '–'}
+                    {signup.amount_adjusted ? ' ✎' : ''}
                   </span>
                   <span style={{ fontSize: 11, color: signup.paid ? '#2e7d32' : '#bbb' }}>
                     {signup.paid ? '✓' : '–'}
