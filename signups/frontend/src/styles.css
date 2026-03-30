@@ -182,6 +182,18 @@ textarea {
   padding: 20px;
 }
 
+.public-signup-summary {
+  display: grid;
+  gap: 16px;
+}
+
+.public-signup-summary-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .public-signup-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -210,6 +222,69 @@ textarea {
   font-weight: 700;
   letter-spacing: -0.03em;
   color: #1e2d7d;
+}
+
+.public-signup-summary-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-signup-summary-status.is-open {
+  color: #137333;
+  background: #f0fbf2;
+  border: 1px solid #cde8d0;
+}
+
+.public-signup-summary-status.is-full {
+  color: #b42318;
+  background: #fff1f0;
+  border: 1px solid #f5c7c4;
+}
+
+.public-signup-courts-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7380bf;
+}
+
+.public-signup-courts-list {
+  display: grid;
+  gap: 8px;
+}
+
+.public-signup-court-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f7f9ff;
+  border: 1px solid #e6ebff;
+  color: #5f6897;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.public-signup-court-row strong {
+  color: #1e2d7d;
+  font-weight: 600;
+}
+
+.public-signup-court-row span:last-child {
+  white-space: nowrap;
+  color: #6b74a8;
+  font-weight: 600;
 }
 
 .public-signup-form-card,
@@ -411,5 +486,15 @@ textarea {
   .public-signup-form-card,
   .public-signup-cancel-panel {
     border-radius: 16px;
+  }
+
+  .public-signup-summary-header,
+  .public-signup-court-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .public-signup-court-row span:last-child {
+    white-space: normal;
   }
 }

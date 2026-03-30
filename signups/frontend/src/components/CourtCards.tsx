@@ -15,44 +15,37 @@ export default function CourtCards({
   totalCapacity,
 }: Props) {
   const isFull = confirmedCount >= totalCapacity
+  const totalSpotsLabel = isFull
+    ? `Full${waitlistCount > 0 ? ` · ${waitlistCount} waitlist` : ''}`
+    : `${totalCapacity - confirmedCount} spot${
+        totalCapacity - confirmedCount === 1 ? '' : 's'
+      } left before waitlist`
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: 12,
-        marginBottom: 20,
-      }}
-    >
-      {courts.map((court) => {
-        const spotsLabel = isFull
-          ? `Full${waitlistCount > 0 ? ` · ${waitlistCount} waitlist` : ''}`
-          : `${confirmedCount} / ${court.max_players} spots`
-
-        return (
-          <div
-            key={court.id}
-            style={{ border: '1px solid #e0e0e0', borderRadius: 8, padding: 14 }}
-          >
-            <div style={{ fontWeight: 600 }}>{court.name}</div>
-            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-              {formatTime(court.start_time)} - {formatTime(court.end_time)}
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                marginTop: 8,
-                color: isFull ? '#c62828' : '#137333',
-              }}
-            >
-              {spotsLabel}
-            </div>
+    <section className="public-signup-summary">
+      <div className="public-signup-summary-header">
+        <div>
+          <div className="public-signup-summary-label">Session Summary</div>
+          <div className="public-signup-summary-value">{totalSpotsLabel}</div>
+        </div>
+        <div className={`public-signup-summary-status ${isFull ? 'is-full' : 'is-open'}`}>
+          {isFull ? 'Full' : 'Open'}
+        </div>
+      </div>
+      <div className="public-signup-courts-label">Courts</div>
+      <div className="public-signup-courts-list">
+        {courts.map((court) => (
+          <div key={court.id} className="public-signup-court-row">
+            <span>
+              <strong>{court.name}</strong> · {formatTime(court.start_time)} -{' '}
+              {formatTime(court.end_time)}
+            </span>
+            <span>
+              {court.max_players} spot{court.max_players === 1 ? '' : 's'}
+            </span>
           </div>
-        )
-      })}
-    </div>
+        ))}
+      </div>
+    </section>
   )
 }
-
