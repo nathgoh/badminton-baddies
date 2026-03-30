@@ -168,6 +168,100 @@ textarea {
   gap: 16px;
 }
 
+.public-roster {
+  display: grid;
+  gap: 16px;
+}
+
+.public-roster-card {
+  background: #fff;
+  border: 1px solid #e6e9f7;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 8px 24px rgba(24, 34, 86, 0.06);
+}
+
+.public-roster-card-waitlist {
+  border-color: #ffe0b8;
+  box-shadow: 0 8px 24px rgba(24, 34, 86, 0.04);
+}
+
+.public-roster-card-header {
+  display: grid;
+  gap: 6px;
+}
+
+.public-roster-card-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7f88a8;
+}
+
+.public-roster-card-label-waitlist {
+  color: #d46b08;
+}
+
+.public-roster-card-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1f294a;
+}
+
+.public-roster-list {
+  margin-top: 14px;
+  border-top: 1px solid #e8ebf8;
+}
+
+.public-roster-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+}
+
+.public-roster-row + .public-roster-row {
+  border-top: 1px solid #eef1fb;
+}
+
+.public-roster-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #eef1ff;
+  color: #3242c2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.public-roster-badge-waitlist {
+  width: 30px;
+  height: 30px;
+  background: #fff4e7;
+  color: #b25a00;
+}
+
+.public-roster-name {
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: #1f294a;
+}
+
+.public-roster-name-waitlist {
+  color: #3b2a12;
+}
+
+.public-roster-empty {
+  padding: 18px 0 4px;
+  color: #6b74a8;
+  text-align: center;
+}
+
 .public-signup-summary,
 .public-signup-form-card,
 .public-signup-cancel-panel {
