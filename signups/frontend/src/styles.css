@@ -683,3 +683,8 @@ textarea {
     white-space: normal;
   }
 }
+
+.admin-session-detail-stack {
+  display: grid;
+  gap: 16px;
+}
