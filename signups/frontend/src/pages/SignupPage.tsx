@@ -9,6 +9,12 @@ import { getPublicSession } from '../api/client'
 import type { PublicSessionResponse, Signup } from '../types'
 
 type Tab = 'signup' | 'roster'
+type CancelSectionCompatProps = {
+  token: string
+  expanded: boolean
+  onToggle: () => void
+  onCancelled: () => void
+}
 
 export default function SignupPage() {
   const { token } = useParams<{ token: string }>()
@@ -16,6 +22,9 @@ export default function SignupPage() {
   const [tab, setTab] = useState<Tab>('signup')
   const [error, setError] = useState<string | null>(null)
   const [successSignup, setSuccessSignup] = useState<Signup | null>(null)
+  const [showCancelSection, setShowCancelSection] = useState(false)
+
+  const CompatCancelSection = CancelSection as unknown as (props: CancelSectionCompatProps) => JSX.Element
 
   async function load() {
     if (!token) {
@@ -44,81 +53,78 @@ export default function SignupPage() {
   const totalSignups = confirmed_count + waitlist_count
 
   return (
-    <div style={{ maxWidth: 640, margin: '0 auto', fontFamily: 'sans-serif' }}>
-      <div style={{ background: '#3f51b5', color: 'white', padding: '20px 24px' }}>
-        <div style={{ fontSize: 22, fontWeight: 'bold' }}>{session.name}</div>
-        <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>{session.date}</div>
+    <div className="public-signup-page">
+      <div className="public-signup-hero">
+        <div className="public-signup-hero-top">
+          <div className="public-signup-session-meta">
+            <div className="public-signup-session-chip">Thursday Session</div>
+            <div className="public-signup-session-name">{session.name}</div>
+            <div className="public-signup-session-date">{session.date}</div>
+          </div>
+          <div className="public-signup-availability-card">
+            <div className="public-signup-availability-label">Availability</div>
+            <div className="public-signup-availability-value">
+              {confirmed_count}/{total_capacity}
+            </div>
+            <div className="public-signup-availability-caption">spots filled</div>
+          </div>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', borderBottom: '2px solid #e0e0e0' }}>
+      <div className="public-signup-tabs" role="tablist" aria-label="Signup page sections">
         {(['signup', 'roster'] as Tab[]).map((currentTab) => (
           <button
             key={currentTab}
             onClick={() => setTab(currentTab)}
-            style={{
-              padding: '10px 20px',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              fontWeight: tab === currentTab ? 600 : 400,
-              color: tab === currentTab ? '#3f51b5' : '#888',
-              borderBottom: tab === currentTab ? '2px solid #3f51b5' : 'none',
-              marginBottom: -2,
-            }}
+            className="public-signup-tab"
+            type="button"
+            role="tab"
+            aria-selected={tab === currentTab}
           >
             {currentTab === 'signup' ? 'Sign Up' : `Roster (${totalSignups})`}
           </button>
         ))}
       </div>
 
-      <div style={{ padding: '20px 24px' }}>
-        {tab === 'signup' ? (
-          <>
-            <CourtCards
-              courts={courts}
-              confirmedCount={confirmed_count}
-              waitlistCount={waitlist_count}
-              totalCapacity={total_capacity}
-            />
-            {successSignup ? (
-              <div
-                style={{
-                  padding: 20,
-                  textAlign: 'center',
-                  color: '#137333',
-                  border: '1px solid #a5d6a7',
-                  borderRadius: 8,
-                  marginBottom: 16,
-                }}
-              >
-                {successSignup.status === 'confirmed'
-                  ? "You're signed up!"
-                  : "You've been added to the waitlist."}
-              </div>
-            ) : (
-              <SignupForm
-                token={token!}
-                isActive={session.is_active}
-                isFull={confirmed_count >= total_capacity}
-                onSuccess={(signup) => {
-                  setSuccessSignup(signup)
-                  void load()
-                }}
-              />
-            )}
-            <CancelSection
+      {tab === 'signup' ? (
+        <div className="public-signup-content">
+          <CourtCards
+            courts={courts}
+            confirmedCount={confirmed_count}
+            waitlistCount={waitlist_count}
+            totalCapacity={total_capacity}
+          />
+          <CompatCancelSection
+            token={token!}
+            expanded={showCancelSection}
+            onToggle={() => setShowCancelSection((value) => !value)}
+            onCancelled={() => {
+              setSuccessSignup(null)
+              setShowCancelSection(false)
+              void load()
+            }}
+          />
+          {successSignup ? (
+            <div className="public-signup-success">
+              {successSignup.status === 'confirmed'
+                ? "You're signed up!"
+                : "You've been added to the waitlist."}
+            </div>
+          ) : (
+            <SignupForm
               token={token!}
-              onCancelled={() => {
-                setSuccessSignup(null)
+              isActive={session.is_active}
+              isFull={confirmed_count >= total_capacity}
+              onSuccess={(signup) => {
+                setSuccessSignup(signup)
                 void load()
               }}
             />
-          </>
-        ) : (
-          <RosterTab signups={signups} />
-        )}
-      </div>
+          )}
+        </div>
+      ) : (
+        <RosterTab signups={signups} />
+      )}
     </div>
   )
 }
-
