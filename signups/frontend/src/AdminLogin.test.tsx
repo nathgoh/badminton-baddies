@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import AdminLoginSource from './pages/AdminLogin.tsx?raw'
+import MainSource from './main.tsx?raw'
 
-describe('AdminLogin structure hooks', () => {
-  it('includes the mobile admin login shell hooks in the page source', () => {
-    expect(AdminLoginSource).toContain('admin-shell')
-    expect(AdminLoginSource).toContain('admin-login-page')
-    expect(AdminLoginSource).toContain('admin-login-card')
+// Temporary migration coverage: verify the frontend entry points at Tailwind CSS.
+describe('frontend styling entry wiring', () => {
+  it('imports the Tailwind entry stylesheet', () => {
+    expect(MainSource).toMatch(/["']\.\/tailwind\.css["']/)
+    expect(MainSource).not.toMatch(/["']\.\/styles\.css["']/)
   })
 })
