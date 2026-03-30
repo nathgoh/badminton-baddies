@@ -32,10 +32,12 @@ describe('RosterTab', () => {
       />,
     )
 
+    expect(markup).toContain('public-roster-card-confirmed')
     expect(markup).toContain('Confirmed')
     expect(markup).toContain('2 players in this session')
     expect(markup).toContain('>1<')
     expect(markup).toContain('>2<')
+    expect(markup).not.toContain('Full')
   })
 
   it('renders waitlist rows with row-level W markers only', () => {
@@ -43,6 +45,7 @@ describe('RosterTab', () => {
       <RosterTab signups={[signup('three', 'Johnny', 'waitlist')]} />,
     )
 
+    expect(markup).toContain('public-roster-card-waitlist')
     expect(markup).toContain('Waitlist')
     expect(markup).toContain('1 player waiting')
     expect(markup).toContain('>W1<')
