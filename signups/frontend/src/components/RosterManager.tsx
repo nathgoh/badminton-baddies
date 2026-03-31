@@ -15,6 +15,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
   const waitlisted = signups.filter((signup) => signup.status === 'waitlist')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState('')
+  const [originalAmount, setOriginalAmount] = useState('')
 
   async function handleSaveAmount(signupId: string) {
     await updateSignupAmount(signupId, parseFloat(editAmount))
@@ -41,8 +42,10 @@ export default function RosterManager({ signups, onRefresh }: Props) {
   }
 
   function startEditingAmount(signup: Signup) {
+    const value = signup.amount_owed != null ? String(signup.amount_owed) : ''
     setEditingId(signup.id)
-    setEditAmount(signup.amount_owed != null ? String(signup.amount_owed) : '')
+    setEditAmount(value)
+    setOriginalAmount(value)
   }
 
   return (
@@ -119,13 +122,17 @@ export default function RosterManager({ signups, onRefresh }: Props) {
 
                 <div className="flex flex-col gap-3 pt-3 sm:flex-row">
                   {isEditing ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => void handleSaveAmount(signup.id)}
-                    >
-                      Save
-                    </Button>
+                    <>
+                      <Button type="button" onClick={() => void handleSaveAmount(signup.id)}>
+                        Save
+                      </Button>
+                      <Button type="button" variant="secondary" onClick={() => setEditAmount(originalAmount)}>
+                        Reset
+                      </Button>
+                      <Button type="button" variant="secondary" onClick={() => setEditingId(null)}>
+                        Cancel
+                      </Button>
+                    </>
                   ) : null}
                   <Button
                     type="button"
