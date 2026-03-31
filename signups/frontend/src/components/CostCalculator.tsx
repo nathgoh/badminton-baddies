@@ -180,11 +180,12 @@ export default function CostCalculator({ data, onRefresh }: Props) {
                     </label>
                   </div>
 
-                  <div className="flex gap-3">
-                    <Button type="submit" variant="secondary">Save</Button>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button type="submit" variant="secondary" className="w-full sm:w-auto">Save</Button>
                     <Button
                       type="button"
                       variant="ghost"
+                      className="w-full sm:w-auto"
                       onClick={() => { setEditingCourtId(null); setEditValues(null) }}
                     >
                       Cancel
