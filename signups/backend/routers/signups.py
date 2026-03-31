@@ -18,6 +18,7 @@ try:
         SignupUpdate,
     )
     from ..storage.adapter import StorageAdapter
+    from .admin import _recalculate_session_costs
 except ImportError:
     from dependencies import get_storage
     from models import (
@@ -32,6 +33,7 @@ except ImportError:
         SignupUpdate,
     )
     from storage.adapter import StorageAdapter
+    from routers.admin import _recalculate_session_costs
 
 
 router = APIRouter()
@@ -67,12 +69,6 @@ def _promote_next_from_waitlist(session_id: str, storage: StorageAdapter) -> Opt
         if waitlisted:
             return storage.update_signup(waitlisted[0].id, SignupUpdate(status=SignupStatus.confirmed))
     return None
-
-
-try:
-    from . import admin as admin_router
-except ImportError:
-    import routers.admin as admin_router
 
 
 @router.get("/public/{token}", response_model=PublicSessionResponse)
@@ -130,7 +126,7 @@ def create_signup(
         PlayerUpsert(email=body.email, name=body.name, venmo_or_phone=body.venmo_or_phone)
     )
     if signup.status == SignupStatus.confirmed:
-        admin_router._recalculate_session_costs(session.id, storage)
+        _recalculate_session_costs(session.id, storage)
         signup = next(item for item in storage.get_signups(session.id) if item.id == signup.id)
     return signup
 
@@ -192,6 +188,8 @@ def cancel_signup(
         SignupUpdate(status=SignupStatus.cancelled, cancelled_at=datetime.now(timezone.utc)),
     )
     _promote_next_from_waitlist(session.id, storage)
-    if was_confirmed:
-        admin_router._recalculate_session_costs(session.id, storage)
+    if was_confirmed and any(
+        item.status == SignupStatus.confirmed for item in storage.get_signups(session.id)
+    ):
+        _recalculate_session_costs(session.id, storage)
     return cancelled
