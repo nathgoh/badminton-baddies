@@ -2,6 +2,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import CourtCards from './components/CourtCards'
+import signupFormSource from './components/SignupForm.tsx?raw'
+import buttonSource from './components/ui/Button.tsx?raw'
+import cardSource from './components/ui/Card.tsx?raw'
+import fieldSource from './components/ui/Field.tsx?raw'
 import signupPageSource from './pages/SignupPage.tsx?raw'
 import type { Court } from './types'
 
@@ -67,5 +71,25 @@ describe('CourtCards', () => {
     expect(signupPageSource).toContain('data-testid="public-shell"')
     expect(signupPageSource).toContain('data-testid="public-hero"')
     expect(signupPageSource).toContain('data-testid="public-tab-bar"')
+  })
+
+  it('adds minimal public ui primitives and wires SignupForm through them', () => {
+    expect(buttonSource).toContain('export default function Button')
+    expect(cardSource).toContain('export default function Card')
+    expect(fieldSource).toContain('export default function Field')
+    expect(signupFormSource).toContain("from './ui/Button'")
+    expect(signupFormSource).toContain("from './ui/Card'")
+    expect(signupFormSource).toContain("from './ui/Field'")
+  })
+
+  it('uses a waitlist-aware success eyebrow in SignupPage source', () => {
+    expect(signupPageSource).toContain("{successSignup.status === 'confirmed' ? 'Confirmed' : 'Waitlist'}")
+  })
+
+  it('keeps Button and Card primitives visually neutral in source', () => {
+    expect(buttonSource).not.toContain('bg-ink-950')
+    expect(buttonSource).not.toContain('bg-rose-600')
+    expect(cardSource).not.toContain('shadow-soft')
+    expect(cardSource).not.toContain('backdrop-blur-sm')
   })
 })

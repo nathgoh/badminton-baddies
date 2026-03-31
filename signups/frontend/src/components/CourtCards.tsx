@@ -1,5 +1,6 @@
 import type { Court } from '../types'
 import { formatCancellationStatus, formatTime } from '../utils'
+import Card from './ui/Card'
 
 interface Props {
   courts: Court[]
@@ -13,7 +14,7 @@ interface Props {
 export default function CourtCards({
   courts,
   confirmedCount,
-  waitlistCount: _waitlistCount,
+  waitlistCount,
   totalCapacity,
   sessionDate,
   cancelWindowHours,
@@ -26,33 +27,61 @@ export default function CourtCards({
   const cancellationStatus = formatCancellationStatus(sessionDate, cancelWindowHours)
 
   return (
-    <section className="public-signup-summary">
-      <div className="public-signup-summary-header">
-        <div>
-          <div className="public-signup-summary-label">Session Summary</div>
+    <Card className="space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">
+            Session Summary
+          </div>
+          {summaryValue ? (
+            <div className="text-2xl font-semibold text-ink-950">{summaryValue}</div>
+          ) : null}
+          <div className="text-sm text-ink-700">{cancellationStatus}</div>
         </div>
-        <div className={`public-signup-summary-status ${isFull ? 'is-full' : 'is-open'}`}>
+        <div
+          className={`rounded-full px-3 py-1 text-sm font-semibold ${
+            isFull ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+          }`}
+        >
           {isFull ? 'Full' : 'Open'}
         </div>
       </div>
-      <div className="public-signup-summary-body">
-        {summaryValue ? <div className="public-signup-summary-value">{summaryValue}</div> : null}
-        <div className="public-signup-summary-meta">{cancellationStatus}</div>
+      <div className="grid gap-3 rounded-[1.5rem] bg-sand-50/80 p-4 text-sm text-ink-700 sm:grid-cols-3">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">
+            Confirmed
+          </div>
+          <div className="mt-1 text-lg font-semibold text-ink-950">{confirmedCount}</div>
+        </div>
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">
+            Capacity
+          </div>
+          <div className="mt-1 text-lg font-semibold text-ink-950">{totalCapacity}</div>
+        </div>
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">
+            Waitlist
+          </div>
+          <div className="mt-1 text-lg font-semibold text-ink-950">{waitlistCount}</div>
+        </div>
       </div>
-      <div className="public-signup-courts-label">Courts</div>
-      <div className="public-signup-courts-list">
+      <div className="space-y-3">
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">Courts</div>
         {courts.map((court) => (
-          <div key={court.id} className="public-signup-court-row">
-            <span>
-              <strong>{court.name}</strong> · {formatTime(court.start_time)} -{' '}
-              {formatTime(court.end_time)}
+          <div
+            key={court.id}
+            className="flex flex-col gap-2 rounded-[1.5rem] border border-sand-100 bg-white/80 px-4 py-3 text-sm text-ink-700 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span className="font-medium text-ink-950">
+              <strong>{court.name}</strong> · {formatTime(court.start_time)} - {formatTime(court.end_time)}
             </span>
-            <span>
+            <span className="rounded-full bg-sand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-ink-700">
               {court.max_players} spot{court.max_players === 1 ? '' : 's'}
             </span>
           </div>
         ))}
       </div>
-    </section>
+    </Card>
   )
 }

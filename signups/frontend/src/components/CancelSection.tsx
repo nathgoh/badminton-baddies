@@ -2,6 +2,9 @@ import { useId, useState } from 'react'
 
 import { cancelSignup, lookupCancel } from '../api/client'
 import type { CancelLookupResponse } from '../types'
+import Button from './ui/Button'
+import Card from './ui/Card'
+import Field from './ui/Field'
 
 interface Props {
   token: string
@@ -13,6 +16,9 @@ interface Props {
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
+
+const inputClasses =
+  'w-full rounded-2xl border border-sand-100 bg-white px-4 py-3 text-sm text-ink-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
 
 export default function CancelSection({ token, expanded, onToggle, onCancelled }: Props) {
   const emailInputId = useId()
@@ -51,63 +57,73 @@ export default function CancelSection({ token, expanded, onToggle, onCancelled }
   }
 
   return (
-    <div className="public-signup-cancel-panel">
-      <button
+    <Card data-testid="cancel-card" className="space-y-4">
+      <Button
+        data-testid="cancel-toggle"
         type="button"
-        className="public-signup-cancel-trigger"
+        variant="ghost"
         aria-expanded={expanded}
         aria-controls={detailsId}
         onClick={onToggle}
+        className="flex w-full items-center justify-between gap-4 rounded-[1.5rem] border border-sand-100 bg-sand-50/80 px-4 py-3 text-left"
       >
-        <span className="public-signup-cancel-trigger-copy">
-          <span className="public-signup-cancel-trigger-title">Already signed up?</span>
-          <span className="public-signup-cancel-trigger-subtitle">Manage your signup</span>
+        <span className="space-y-1">
+          <span className="block text-sm font-semibold text-ink-950">Already signed up?</span>
+          <span className="block text-sm text-ink-700">Manage your signup</span>
         </span>
-        <span className="public-signup-cancel-trigger-action">{expanded ? 'Hide' : 'Open'}</span>
-      </button>
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+          {expanded ? 'Hide' : 'Open'}
+        </span>
+      </Button>
       {expanded ? (
-        <div id={detailsId} className="public-signup-cancel-details">
-          <div className="public-signup-cancel-controls">
-            <div className="public-signup-field">
-              <label htmlFor={emailInputId}>Email</label>
+        <div id={detailsId} className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <Field label="Email" htmlFor={emailInputId} className="flex-1">
               <input
                 id={emailInputId}
                 type="email"
                 placeholder="Enter your email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
+                className={inputClasses}
               />
-            </div>
-            <button
+            </Field>
+            <Button
               type="button"
-              className="public-signup-secondary-button public-signup-cancel-lookup"
+              variant="secondary"
               onClick={handleLookup}
+              className="sm:mb-0.5"
             >
               Find signup
-            </button>
+            </Button>
           </div>
-          {error ? <div className="public-signup-inline-error">{error}</div> : null}
+          {error ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {error}
+            </div>
+          ) : null}
           {lookup ? (
-            <div className="public-signup-cancel-result">
-              <div>
+            <div className="rounded-[1.5rem] border border-sand-100 bg-sand-50/70 p-4">
+              <div className="text-sm text-ink-700">
                 Found: <strong>{lookup.signup.name}</strong> - <em>{lookup.signup.status}</em>
               </div>
               {lookup.can_cancel ? (
-                <button
+                <Button
                   type="button"
                   onClick={handleCancel}
                   disabled={loading}
-                  className="public-signup-danger-button public-signup-cancel-confirm"
+                  variant="danger"
+                  className="mt-4"
                 >
                   {loading ? 'Cancelling...' : 'Cancel my spot'}
-                </button>
+                </Button>
               ) : (
-                <div className="public-signup-cancel-reason">{lookup.reason}</div>
+                <div className="mt-3 text-sm text-ink-700">{lookup.reason}</div>
               )}
             </div>
           ) : null}
         </div>
       ) : null}
-    </div>
+    </Card>
   )
 }
