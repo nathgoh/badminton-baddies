@@ -17,6 +17,8 @@ describe('AdminSessionDetail structure hooks', () => {
       await load()`)
     expect(AdminSessionDetailSource).toContain('CostCalculator data={data} onRefresh={handleRefresh}')
     expect(AdminSessionDetailSource).toContain('RosterManager signups={data.signups} onRefresh={handleRefresh}')
+    expect(AdminSessionDetailSource).toContain('Cost per player')
+    expect(AdminSessionDetailSource).toContain('costPerPlayer={data.confirmed_count > 0')
     expect(AdminSessionDetailSource).not.toContain('handleCalculate')
     expect(AdminSessionDetailSource).not.toContain('calculateCosts')
     expect(AdminSessionDetailSource).not.toContain('Calculate & assign costs')
