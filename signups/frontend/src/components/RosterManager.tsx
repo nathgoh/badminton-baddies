@@ -157,6 +157,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                           onChange={(event) => setEditAmount(event.target.value)}
                           className="w-full rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 sm:max-w-[140px]"
                           autoFocus
+                          onFocus={(e) => e.target.select()}
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); void handleSaveAmount(signup.id) } }}
                           onBlur={() => setTimeout(() => setEditingId(null), 150)}
