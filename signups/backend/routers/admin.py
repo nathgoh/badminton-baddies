@@ -67,6 +67,49 @@ def _get_session_by_id(storage: StorageAdapter, session_id: str) -> Session:
     return session
 
 
+def _recalculate_session_costs(
+    session_id: str, storage: StorageAdapter
+) -> CostCalculationResult:
+    courts = storage.get_courts(session_id)
+    confirmed = [
+        signup for signup in storage.get_signups(session_id) if signup.status == SignupStatus.confirmed
+    ]
+    if not confirmed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No confirmed players to calculate costs for",
+        )
+
+    total_cost = sum(court.total_cost for court in courts)
+    adjusted = [s for s in confirmed if s.amount_adjusted and s.amount_owed is not None]
+    unadjusted = [s for s in confirmed if not s.amount_adjusted]
+    adjusted_total = round(sum(s.amount_owed for s in adjusted), 2)
+
+    if adjusted_total > round(total_cost, 2):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Adjusted amounts (${adjusted_total:.2f}) exceed total cost (${total_cost:.2f})",
+        )
+
+    if not unadjusted:
+        return CostCalculationResult(
+            total_cost=total_cost,
+            confirmed_count=len(confirmed),
+            base_amount=0.0,
+        )
+
+    remaining = total_cost - adjusted_total
+    base_amount = round(remaining / len(unadjusted), 2)
+    for signup in unadjusted:
+        storage.update_signup(signup.id, SignupUpdate(amount_owed=base_amount))
+
+    return CostCalculationResult(
+        total_cost=total_cost,
+        confirmed_count=len(confirmed),
+        base_amount=base_amount,
+    )
+
+
 @router.get("/sessions/{session_id}", response_model=AdminSessionResponse)
 def get_admin_session(
     session_id: str, storage: StorageAdapter = Depends(get_storage)
@@ -91,38 +134,7 @@ def get_admin_session(
 def calculate_costs(
     session_id: str, storage: StorageAdapter = Depends(get_storage)
 ) -> CostCalculationResult:
-    courts = storage.get_courts(session_id)
-    confirmed = [
-        signup for signup in storage.get_signups(session_id) if signup.status == SignupStatus.confirmed
-    ]
-    if not confirmed:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No confirmed players to calculate costs for",
-        )
-    total_cost = sum(court.total_cost for court in courts)
-
-    adjusted = [s for s in confirmed if s.amount_adjusted and s.amount_owed is not None]
-    unadjusted = [s for s in confirmed if not s.amount_adjusted]
-    adjusted_total = sum(s.amount_owed for s in adjusted)
-
-    if not unadjusted:
-        if round(adjusted_total, 2) != round(total_cost, 2):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Adjusted amounts (${adjusted_total:.2f}) do not sum to total cost (${total_cost:.2f})",
-            )
-        return CostCalculationResult(total_cost=total_cost, confirmed_count=len(confirmed), base_amount=0.0)
-
-    remaining = total_cost - adjusted_total
-    base_amount = round(remaining / len(unadjusted), 2)
-    for signup in unadjusted:
-        storage.update_signup(signup.id, SignupUpdate(amount_owed=base_amount))
-    return CostCalculationResult(
-        total_cost=total_cost,
-        confirmed_count=len(confirmed),
-        base_amount=base_amount,
-    )
+    return _recalculate_session_costs(session_id, storage)
 
 
 @router.patch("/signups/{signup_id}", response_model=Signup)
@@ -204,4 +216,3 @@ def update_player(
             venmo_or_phone=body.venmo_or_phone or player.venmo_or_phone,
         )
     )
-
