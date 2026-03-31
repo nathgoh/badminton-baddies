@@ -50,8 +50,18 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
   }
 
   async function handleTogglePaid(signupId: string, currentPaid: boolean) {
+    if (currentPaid && !window.confirm('Mark this player as unpaid?')) return
     setOptimisticPaid((prev) => ({ ...prev, [signupId]: !currentPaid }))
     await markSignupPaid(signupId, !currentPaid)
+    onRefresh()
+  }
+
+  async function handleMarkAllPaid() {
+    const unpaid = confirmed.filter((s) => !(optimisticPaid[s.id] ?? s.paid))
+    if (unpaid.length === 0) return
+    if (!window.confirm(`Mark all ${unpaid.length} player${unpaid.length === 1 ? '' : 's'} as paid?`)) return
+    setOptimisticPaid((prev) => Object.fromEntries(confirmed.map((s) => [s.id, true])) as typeof prev)
+    await Promise.all(unpaid.map((s) => markSignupPaid(s.id, true)))
     onRefresh()
   }
 
@@ -70,12 +80,19 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
   return (
     <div className="grid gap-4">
       <Card className="space-y-5">
-        <div className="space-y-1">
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">Roster</div>
-          <div className="text-2xl font-semibold text-ink-950">
-            {confirmed.length} confirmed player{confirmed.length === 1 ? '' : 's'}
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">Roster</div>
+            <div className="text-2xl font-semibold text-ink-950">
+              {confirmed.length} confirmed player{confirmed.length === 1 ? '' : 's'}
+            </div>
+            <p className="text-xs text-ink-500">Tap card to mark paid · Tap amount to edit</p>
           </div>
-          <p className="text-xs text-ink-500">Tap card to mark paid · Tap amount to edit</p>
+          {confirmed.some((s) => !(optimisticPaid[s.id] ?? s.paid)) ? (
+            <Button type="button" variant="secondary" onClick={() => void handleMarkAllPaid()}>
+              Mark all paid
+            </Button>
+          ) : null}
         </div>
         <div className="space-y-3" data-testid="roster-list">
           {confirmed.map((signup) => {
