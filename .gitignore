@@ -2,5 +2,13 @@
 .worktrees/
 signups/backend/.venv/
 signups/backend/.env
+signups/backend/.env.*
+!signups/backend/.env.example
 signups/frontend/.env
+signups/frontend/.env.*
 signups/.pytest_cache/
+signups/backend/dist/
+*credentials*.json
+service-account*.json
+*.pem
+*.p12
