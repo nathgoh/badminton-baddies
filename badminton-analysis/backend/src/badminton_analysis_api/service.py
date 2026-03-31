@@ -179,6 +179,8 @@ class AnalysisService:
         page_size: int = 20,
         owner_id: str | None = None,
     ) -> AnalysisListResponse:
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
         records = self._visible_records(owner_id)
         start = (page - 1) * page_size
         end = start + page_size
