@@ -168,6 +168,8 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                           className={`cursor-pointer rounded-full px-5 py-2.5 text-base font-semibold transition hover:opacity-80 ${
                             isPaid
                               ? 'bg-emerald-200 text-emerald-900'
+                              : signup.amount_adjusted
+                              ? 'bg-blue-100 text-blue-800'
                               : 'bg-slate-100 text-slate-700'
                           }`}
                           onClick={(e) => { e.stopPropagation(); startEditingAmount(signup) }}
