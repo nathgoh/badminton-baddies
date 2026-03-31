@@ -115,9 +115,12 @@ def _recalculate_session_costs(
         )
 
     remaining = total_cost - adjusted_total
+    remaining_cents = int(round(remaining * 100))
+    base_cents, extra_cents = divmod(remaining_cents, len(unadjusted))
     base_amount = round(remaining / len(unadjusted), 2)
-    for signup in unadjusted:
-        storage.update_signup(signup.id, SignupUpdate(amount_owed=base_amount))
+    for index, signup in enumerate(unadjusted):
+        amount_cents = base_cents + (1 if index < extra_cents else 0)
+        storage.update_signup(signup.id, SignupUpdate(amount_owed=amount_cents / 100))
 
     return CostCalculationResult(
         total_cost=total_cost,

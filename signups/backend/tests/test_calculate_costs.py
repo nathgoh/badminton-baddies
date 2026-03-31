@@ -49,6 +49,30 @@ def test_calculate_costs_subtracts_adjusted_player_from_pool(client: TestClient,
     assert storage._signups[s3.id].amount_owed == 12.0
 
 
+def test_calculate_costs_assigns_rounding_remainder_without_losing_total(client: TestClient, storage: InMemoryAdapter):
+    session = storage.create_session(SessionCreate(name="Test", date=date.today(), is_active=True))
+    storage.create_court(
+        CourtCreate(
+            session_id=session.id,
+            name="Court 1",
+            start_time="19:00",
+            end_time="22:00",
+            max_players=6,
+            total_cost=10.0,
+        )
+    )
+    s1 = storage.create_signup(SignupCreate(session_id=session.id, email="a@x.com", name="A", payment_agreed=True))
+    s2 = storage.create_signup(SignupCreate(session_id=session.id, email="b@x.com", name="B", payment_agreed=True))
+    s3 = storage.create_signup(SignupCreate(session_id=session.id, email="c@x.com", name="C", payment_agreed=True))
+
+    response = client.post(f"/api/admin/sessions/{session.id}/calculate-costs")
+
+    assert response.status_code == 200
+    amounts = sorted(storage._signups[signup_id].amount_owed for signup_id in [s1.id, s2.id, s3.id])
+    assert amounts == [3.33, 3.33, 3.34]
+    assert round(sum(amounts), 2) == 10.0
+
+
 def test_calculate_costs_all_adjusted_summing_to_total_succeeds(client: TestClient, storage: InMemoryAdapter):
     session_id = _setup(storage)  # $30 total
     s1 = storage.create_signup(SignupCreate(session_id=session_id, email="a@x.com", name="A", payment_agreed=True))
