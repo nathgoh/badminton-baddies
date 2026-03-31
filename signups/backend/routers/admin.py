@@ -65,13 +65,18 @@ def _get_session_by_id(storage: StorageAdapter, session_id: str) -> Session:
     return session
 
 
-def _recalculate_session_costs(
-    session_id: str, storage: StorageAdapter
-) -> CostCalculationResult:
+def _get_signup_by_id(storage: StorageAdapter, signup_id: str) -> Signup:
+    for session in storage.list_sessions():
+        signup = next((item for item in storage.get_signups(session.id) if item.id == signup_id), None)
+        if signup is not None:
+            return signup
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signup not found")
+
+
+def _validate_projected_confirmed_costs(
+    session_id: str, storage: StorageAdapter, confirmed: list[Signup]
+) -> tuple[float, float, list[Signup], int]:
     courts = storage.get_courts(session_id)
-    confirmed = [
-        signup for signup in storage.get_signups(session_id) if signup.status == SignupStatus.confirmed
-    ]
     if not confirmed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -89,10 +94,23 @@ def _recalculate_session_costs(
             detail=f"Adjusted amounts (${adjusted_total:.2f}) exceed total cost (${total_cost:.2f})",
         )
 
+    return total_cost, adjusted_total, unadjusted, len(confirmed)
+
+
+def _recalculate_session_costs(
+    session_id: str, storage: StorageAdapter
+) -> CostCalculationResult:
+    confirmed = [
+        signup for signup in storage.get_signups(session_id) if signup.status == SignupStatus.confirmed
+    ]
+    total_cost, adjusted_total, unadjusted, confirmed_count = _validate_projected_confirmed_costs(
+        session_id, storage, confirmed
+    )
+
     if not unadjusted:
         return CostCalculationResult(
             total_cost=total_cost,
-            confirmed_count=len(confirmed),
+            confirmed_count=confirmed_count,
             base_amount=0.0,
         )
 
@@ -103,7 +121,7 @@ def _recalculate_session_costs(
 
     return CostCalculationResult(
         total_cost=total_cost,
-        confirmed_count=len(confirmed),
+        confirmed_count=confirmed_count,
         base_amount=base_amount,
     )
 
@@ -142,6 +160,19 @@ def update_signup_amount(
     storage: StorageAdapter = Depends(get_storage),
 ) -> Signup:
     try:
+        existing = _get_signup_by_id(storage, signup_id)
+        if existing.status == SignupStatus.confirmed:
+            projected_confirmed = [
+                signup.model_copy(
+                    update={"amount_owed": body.amount_owed, "amount_adjusted": body.amount_adjusted}
+                )
+                if signup.id == signup_id
+                else signup
+                for signup in storage.get_signups(existing.session_id)
+                if signup.status == SignupStatus.confirmed
+            ]
+            _validate_projected_confirmed_costs(existing.session_id, storage, projected_confirmed)
+
         updated = storage.update_signup(
             signup_id,
             SignupUpdate(amount_owed=body.amount_owed, amount_adjusted=body.amount_adjusted),
@@ -185,22 +216,17 @@ def cancel_signup(signup_id: str, storage: StorageAdapter = Depends(get_storage)
         except ImportError:
             from routers.signups import _promote_next_from_waitlist
 
-        signup = None
-        session_id = None
-        for session in storage.list_sessions():
-            signup = next((item for item in storage.get_signups(session.id) if item.id == signup_id), None)
-            if signup is not None:
-                session_id = session.id
-                break
-        if signup is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signup not found")
+        signup = _get_signup_by_id(storage, signup_id)
+        session_id = signup.session_id
         was_confirmed = signup.status == SignupStatus.confirmed
         cancelled = storage.update_signup(
             signup_id,
             SignupUpdate(status=SignupStatus.cancelled, cancelled_at=datetime.now(timezone.utc)),
         )
         _promote_next_from_waitlist(session_id, storage)
-        if was_confirmed:
+        if was_confirmed and any(
+            item.status == SignupStatus.confirmed for item in storage.get_signups(session_id)
+        ):
             _recalculate_session_costs(session_id, storage)
         return cancelled
     except KeyError as exc:

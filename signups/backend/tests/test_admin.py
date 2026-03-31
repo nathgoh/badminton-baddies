@@ -393,3 +393,77 @@ def test_admin_cancel_with_waitlist_promotion_recalculates_once_for_final_roster
     assert signups["c@t.com"]["amount_owed"] == 7.5
     assert signups["d@t.com"]["amount_owed"] == 7.5
     assert signups["e@t.com"]["amount_owed"] == 7.5
+
+
+def test_admin_cancel_only_confirmed_signup_succeeds_without_recalculation(client, monkeypatch):
+    from ..routers import admin as admin_router
+
+    session = _setup(client)
+    token = session["access_token"]
+    alice = _signup(client, token, "a@t.com", "Alice").json()
+
+    helper_calls = 0
+    original_recalculate_session_costs = admin_router._recalculate_session_costs
+
+    def counting_recalculate_session_costs(*args, **kwargs):
+        nonlocal helper_calls
+        helper_calls += 1
+        return original_recalculate_session_costs(*args, **kwargs)
+
+    monkeypatch.setattr(
+        admin_router,
+        "_recalculate_session_costs",
+        counting_recalculate_session_costs,
+        raising=False,
+    )
+
+    response = client.delete(f"/api/admin/signups/{alice['id']}")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+    assert helper_calls == 0
+
+    session_response = client.get(f"/api/admin/sessions/{session['id']}")
+
+    assert session_response.status_code == 200
+    assert session_response.json()["signups"] == []
+    assert session_response.json()["confirmed_count"] == 0
+    assert session_response.json()["waitlist_count"] == 0
+
+
+def test_invalid_manual_amount_edit_does_not_persist_attempted_change(client):
+    session = _setup(client)
+    token = session["access_token"]
+    alice = _signup(client, token, "a@t.com", "Alice").json()
+    bob = _signup(client, token, "b@t.com", "Bob").json()
+
+    first_update = client.patch(
+        f"/api/admin/signups/{alice['id']}",
+        json={"amount_owed": 25.0, "amount_adjusted": True},
+    )
+
+    assert first_update.status_code == 200
+
+    before_invalid_update = client.get(f"/api/admin/sessions/{session['id']}")
+    before_signups = {
+        signup["email"]: signup for signup in before_invalid_update.json()["signups"]
+    }
+    assert before_signups["a@t.com"]["amount_owed"] == 25.0
+    assert before_signups["a@t.com"]["amount_adjusted"] is True
+    assert before_signups["b@t.com"]["amount_owed"] == 5.0
+    assert before_signups["b@t.com"]["amount_adjusted"] is False
+
+    response = client.patch(
+        f"/api/admin/signups/{bob['id']}",
+        json={"amount_owed": 10.0, "amount_adjusted": True},
+    )
+
+    assert response.status_code == 400
+
+    session_response = client.get(f"/api/admin/sessions/{session['id']}")
+    signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
+
+    assert signups["a@t.com"]["amount_owed"] == 25.0
+    assert signups["a@t.com"]["amount_adjusted"] is True
+    assert signups["b@t.com"]["amount_owed"] == 5.0
+    assert signups["b@t.com"]["amount_adjusted"] is False
