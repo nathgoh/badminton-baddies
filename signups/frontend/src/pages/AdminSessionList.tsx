@@ -256,9 +256,6 @@ export default function AdminSessionList() {
                 </div>
                 <h3 className="text-2xl font-semibold text-ink-950">Create a session</h3>
               </div>
-              <Button onClick={() => setShowForm(false)} type="button" variant="secondary">
-                Close
-              </Button>
             </div>
 
             {error ? (
@@ -416,6 +413,9 @@ export default function AdminSessionList() {
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button type="submit">Create session</Button>
+              <Button onClick={() => setShowForm(false)} type="button" variant="secondary">
+                Cancel
+              </Button>
             </div>
           </Card>
         ) : null}
