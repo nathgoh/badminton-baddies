@@ -35,10 +35,11 @@ describe('RosterManager structure hooks', () => {
     expect(RosterManagerSource).toContain('cursor-default')
   })
 
-  it('hard-stops saving when no other unadjusted confirmed players remain', () => {
+  it('shows an inline error when no other unadjusted confirmed players remain', () => {
     expect(RosterManagerSource).toContain('signup.id === editedSignup.id || signup.amount_adjusted')
     expect(RosterManagerSource).toContain('noOtherUnadjustedConfirmedPlayersRemain')
     expect(RosterManagerSource).toContain('No other unadjusted confirmed players remain to absorb the remaining cost.')
-    expect(RosterManagerSource).toContain('alert(')
+    expect(RosterManagerSource).toContain('editError')
+    expect(RosterManagerSource).toContain('border-rose-200 bg-rose-50')
   })
 })

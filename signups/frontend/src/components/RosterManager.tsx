@@ -16,6 +16,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
   const waitlisted = signups.filter((signup) => signup.status === 'waitlist')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState('')
+  const [editError, setEditError] = useState<string | null>(null)
   const [optimisticPaid, setOptimisticPaid] = useState<Record<string, boolean>>({})
   const [dropdownId, setDropdownId] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -45,13 +46,18 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
       amountChanged &&
       noOtherUnadjustedConfirmedPlayersRemain
     ) {
-      alert('No other unadjusted confirmed players remain to absorb the remaining cost.')
+      setEditError('No other unadjusted confirmed players remain to absorb the remaining cost.')
       return
     }
 
-    await updateSignupAmount(editedSignup.id, parsedAmount)
-    setEditingId(null)
-    await onRefresh()
+    try {
+      setEditError(null)
+      await updateSignupAmount(editedSignup.id, parsedAmount)
+      setEditingId(null)
+      await onRefresh()
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : String(error))
+    }
   }
 
   async function handleResetAmount(signupId: string) {
@@ -100,6 +106,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
     }
     setEditingId(signup.id)
     setEditAmount(signup.amount_owed != null ? signup.amount_owed.toFixed(2) : '')
+    setEditError(null)
   }
 
   function handleAmountBlur(event: FocusEvent<HTMLInputElement>) {
@@ -108,6 +115,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
       return
     }
     setEditingId(null)
+    setEditError(null)
   }
 
   return (
@@ -298,6 +306,11 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                     >
                       Save
                     </Button>
+                    {editError ? (
+                      <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        {editError}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </article>
