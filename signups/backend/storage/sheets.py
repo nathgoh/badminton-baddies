@@ -128,10 +128,10 @@ class SheetsAdapter(StorageAdapter):
         self._ws(sheet_name).update(f"A{row_index}", [values])
         self._invalidate(sheet_name)
 
-    def _find_row_index(self, sheet_name: str, id_val: str) -> int:
-        rows = self._ws(sheet_name).get_all_values()
-        for index, row in enumerate(rows[1:], start=2):
-            if row and row[0] == id_val:
+    def _find_row_index(self, sheet_name: str, cols: list[str], id_val: str) -> int:
+        rows = self._all_rows(sheet_name, cols)
+        for index, row in enumerate(rows, start=2):
+            if row.get(cols[0]) == id_val:
                 return index
         raise KeyError(id_val)
 
@@ -183,7 +183,7 @@ class SheetsAdapter(StorageAdapter):
         self._update_row(
             "sessions",
             SESSION_COLS,
-            self._find_row_index("sessions", id),
+            self._find_row_index("sessions", SESSION_COLS, id),
             {
                 "id": updated.id,
                 "name": updated.name,
@@ -217,7 +217,7 @@ class SheetsAdapter(StorageAdapter):
             self._ws("courts").delete_rows(row_index)
         self._invalidate("courts")
 
-        self._ws("sessions").delete_rows(self._find_row_index("sessions", id))
+        self._ws("sessions").delete_rows(self._find_row_index("sessions", SESSION_COLS, id))
         self._invalidate("sessions")
 
     def _row_to_court(self, row: dict[str, str]) -> Court:
@@ -264,7 +264,7 @@ class SheetsAdapter(StorageAdapter):
         self._update_row(
             "courts",
             COURT_COLS,
-            self._find_row_index("courts", id),
+            self._find_row_index("courts", COURT_COLS, id),
             {
                 "id": updated.id,
                 "session_id": updated.session_id,
@@ -278,7 +278,7 @@ class SheetsAdapter(StorageAdapter):
         return updated
 
     def delete_court(self, id: str) -> None:
-        self._ws("courts").delete_rows(self._find_row_index("courts", id))
+        self._ws("courts").delete_rows(self._find_row_index("courts", COURT_COLS, id))
         self._invalidate("courts")
 
     def _row_to_signup(self, row: dict[str, str]) -> Signup:
@@ -340,7 +340,7 @@ class SheetsAdapter(StorageAdapter):
         self._update_row(
             "signups",
             SIGNUP_COLS,
-            self._find_row_index("signups", id),
+            self._find_row_index("signups", SIGNUP_COLS, id),
             {
                 "id": updated.id,
                 "session_id": updated.session_id,
@@ -399,7 +399,7 @@ class SheetsAdapter(StorageAdapter):
         self._update_row(
             "players",
             PLAYER_COLS,
-            self._find_row_index("players", data.email),
+            self._find_row_index("players", PLAYER_COLS, data.email),
             {
                 "email": updated.email,
                 "name": updated.name,
