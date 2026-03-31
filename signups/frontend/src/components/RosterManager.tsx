@@ -132,15 +132,8 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                 </button>
 
                 <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={() => void handleCancel(signup.id)}
-                  >
-                    Cancel signup
-                  </Button>
                   {isEditing ? (
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 sm:order-last">
                       <Button type="button" onClick={() => void handleSaveAmount(signup.id)}>
                         Save
                       </Button>
@@ -152,6 +145,13 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                       </Button>
                     </div>
                   ) : null}
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={() => void handleCancel(signup.id)}
+                  >
+                    Cancel signup
+                  </Button>
                 </div>
               </article>
             )
