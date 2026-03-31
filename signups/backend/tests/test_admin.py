@@ -179,7 +179,9 @@ def test_admin_cancel_promotes_from_waitlist(client):
     assert dan_after["status"] == "confirmed"
 
 
-def test_waitlist_signup_does_not_recalculate_costs(client):
+def test_waitlist_signup_does_not_recalculate_costs(client, monkeypatch):
+    from ..routers import admin as admin_router
+
     session = _setup(client)
     token = session["access_token"]
     _signup(client, token, "a@t.com", "Alice")
@@ -204,10 +206,21 @@ def test_waitlist_signup_does_not_recalculate_costs(client):
         "d@t.com": 7.5,
     }
 
+    call_count = 0
+    original_calculate_costs = admin_router.calculate_costs
+
+    def counting_calculate_costs(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return original_calculate_costs(*args, **kwargs)
+
+    monkeypatch.setattr(admin_router, "calculate_costs", counting_calculate_costs)
+
     response = _signup(client, token, "e@t.com", "Eve")
 
     assert response.status_code == 201
     assert response.json()["status"] == "waitlist"
+    assert call_count == 0
 
     session_response = client.get(f"/api/admin/sessions/{session['id']}")
     signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
@@ -239,7 +252,9 @@ def test_manual_amount_edit_recalculates_remaining_confirmed_players(client):
     assert signups["c@t.com"]["amount_owed"] == 12.0
 
 
-def test_waitlist_cancel_does_not_recalculate_costs(client):
+def test_waitlist_cancel_does_not_recalculate_costs(client, monkeypatch):
+    from ..routers import admin as admin_router
+
     session = _setup(client)
     token = session["access_token"]
     _signup(client, token, "a@t.com", "Alice")
@@ -266,10 +281,21 @@ def test_waitlist_cancel_does_not_recalculate_costs(client):
 
     eve = _signup(client, token, "e@t.com", "Eve").json()
 
+    call_count = 0
+    original_calculate_costs = admin_router.calculate_costs
+
+    def counting_calculate_costs(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return original_calculate_costs(*args, **kwargs)
+
+    monkeypatch.setattr(admin_router, "calculate_costs", counting_calculate_costs)
+
     response = client.delete(f"/api/admin/signups/{eve['id']}")
 
     assert response.status_code == 200
     assert response.json()["status"] == "cancelled"
+    assert call_count == 0
 
     session_response = client.get(f"/api/admin/sessions/{session['id']}")
     signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
