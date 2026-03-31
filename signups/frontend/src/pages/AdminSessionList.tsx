@@ -1,14 +1,12 @@
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import CostCalculator from '../components/CostCalculator'
-import RosterManager from '../components/RosterManager'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import { createCourt, createSession, deleteSession, getAdminSession, listSessions } from '../api/client'
 import { useAdminAuth } from '../auth/useAdminAuth'
-import { nextExpandedId, isPastSession } from '../utils'
-import type { AdminSessionResponse, Session } from '../types'
+import { isPastSession } from '../utils'
+import type { AdminSessionResponse } from '../types'
 
 interface NewCourtForm {
   name: string
@@ -35,7 +33,7 @@ const inputClassName =
   'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200'
 
 export default function AdminSessionList() {
-  const [sessions, setSessions] = useState<Session[]>([])
+  const [sessions, setSessions] = useState<AdminSessionResponse[]>([])
   const [showForm, setShowForm] = useState(false)
   const [sessionName, setSessionName] = useState('')
   const [sessionDate, setSessionDate] = useState('')
@@ -44,45 +42,18 @@ export default function AdminSessionList() {
     { name: '', start_time: '19:00', end_time: '22:00', max_players: '6', total_cost: '' },
   ])
   const [error, setError] = useState<string | null>(null)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [expandedData, setExpandedData] = useState<AdminSessionResponse | null>(null)
   const { logout, email } = useAdminAuth()
   const navigate = useNavigate()
 
   async function load() {
-    setSessions(await listSessions())
+    const list = await listSessions()
+    const details = await Promise.all(list.map((s) => getAdminSession(s.id)))
+    setSessions(details)
   }
 
   useEffect(() => {
     void load()
   }, [])
-
-  async function handleRowClick(session: Session) {
-    const newId = nextExpandedId(expandedId, session.id)
-    if (newId === null) {
-      setExpandedId(null)
-      setExpandedData(null)
-      return
-    }
-
-    try {
-      const data = await getAdminSession(session.id)
-      setExpandedId(session.id)
-      setExpandedData(data)
-    } catch (caughtError) {
-      setError(errorMessage(caughtError))
-    }
-  }
-
-  async function handleExpandedRefresh() {
-    if (!expandedId) return
-
-    try {
-      setExpandedData(await getAdminSession(expandedId))
-    } catch (caughtError) {
-      setError(errorMessage(caughtError))
-    }
-  }
 
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault()
@@ -119,16 +90,10 @@ export default function AdminSessionList() {
     }
   }
 
-  async function handleDelete(session: Session) {
-    if (!confirm(`Delete "${session.name}"? This cannot be undone.`)) return
+  async function handleDelete(data: AdminSessionResponse) {
+    if (!confirm(`Delete "${data.session.name}"? This cannot be undone.`)) return
 
-    await deleteSession(session.id)
-
-    if (expandedId === session.id) {
-      setExpandedId(null)
-      setExpandedData(null)
-    }
-
+    await deleteSession(data.session.id)
     await load()
   }
 
@@ -140,92 +105,80 @@ export default function AdminSessionList() {
     )
   }
 
-  const upcomingSessions = sessions.filter((s) => !isPastSession(s.date))
-  const pastSessions = sessions.filter((s) => isPastSession(s.date))
+  const upcomingSessions = sessions.filter((d) => !isPastSession(d.session.date))
+  const pastSessions = sessions.filter((d) => isPastSession(d.session.date))
 
-  function renderCard(session: Session) {
-    const isExpanded = expandedId === session.id
+  function renderCard(data: AdminSessionResponse) {
+    const { session } = data
+    const confirmedSignups = data.signups.filter((s) => s.status === 'confirmed')
+    const amountOwed = confirmedSignups.reduce((sum, s) => {
+      if (!s.paid && s.amount_owed !== null) return sum + s.amount_owed
+      return sum
+    }, 0)
+    const allSettled = amountOwed === 0
 
     return (
-      <Fragment key={session.id}>
-        <article
-          className={`rounded-[1.75rem] border bg-white p-5 shadow-sm shadow-slate-200/70 transition ${
-            isExpanded ? 'border-slate-300 shadow-md' : 'border-slate-200'
-          }`}
-        >
-          <button
-            className="w-full text-left"
-            onClick={() => void handleRowClick(session)}
-            type="button"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-lg text-slate-700">
-                  {isExpanded ? '−' : '+'}
-                </div>
-                <div className="min-w-0 space-y-1">
-                  <div className="inline-flex rounded-full bg-sand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-ink-700">
-                    {session.is_active ? 'Active' : 'Draft'}
-                  </div>
-                  <div className="text-xl font-semibold text-ink-950">{session.name}</div>
-                  <div className="text-sm text-ink-700">{session.date}</div>
-                </div>
-              </div>
-
-              <div className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
-                {isExpanded ? 'Open' : 'Closed'}
-              </div>
+      <article
+        key={session.id}
+        className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/70"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 space-y-1">
+            <div className="inline-flex rounded-full bg-sand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-ink-700">
+              {session.is_active ? 'Active' : 'Draft'}
             </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[1.5rem] bg-slate-50 px-4 py-3">
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-700">
-                  Cancel window
-                </div>
-                <div className="mt-1 text-base font-semibold text-ink-950">
-                  {formatCancelWindow(session.cancel_window_hours)}
-                </div>
-              </div>
-              <div className="rounded-[1.5rem] bg-sand-50/70 px-4 py-3">
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-700">
-                  Detail panel
-                </div>
-                <div className="mt-1 text-base font-semibold text-ink-950">
-                  {isExpanded ? 'Expanded' : 'Tap to expand'}
-                </div>
-              </div>
-            </div>
-          </button>
-
-          <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row">
-            <Link
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
-              to={`/admin/sessions/${session.id}`}
-            >
-              Open details
-            </Link>
-            <Button
-              onClick={() => void handleDelete(session)}
-              type="button"
-              variant="danger"
-            >
-              Delete
-            </Button>
+            <div className="text-xl font-semibold text-ink-950">{session.name}</div>
+            <div className="text-sm text-ink-700">{session.date}</div>
           </div>
-        </article>
+          <div className="shrink-0 rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+            {formatCancelWindow(session.cancel_window_hours)} cancel
+          </div>
+        </div>
 
-        {isExpanded && expandedData ? (
-          <Card className="border-dashed border-slate-300 bg-slate-50/70">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,0.98fr)_minmax(0,1.02fr)]">
-              <CostCalculator data={expandedData} onRefresh={() => void handleExpandedRefresh()} />
-              <RosterManager
-                onRefresh={() => void handleExpandedRefresh()}
-                signups={expandedData.signups}
-              />
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="rounded-[1.5rem] bg-slate-50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-700">
+              Signed up
             </div>
-          </Card>
-        ) : null}
-      </Fragment>
+            <div className="mt-1 text-base font-semibold text-ink-950">
+              {data.confirmed_count}
+              <span className="text-sm font-normal text-ink-700"> / {data.total_capacity}</span>
+            </div>
+          </div>
+          <div className="rounded-[1.5rem] bg-slate-50 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-700">
+              Waitlist
+            </div>
+            <div className="mt-1 text-base font-semibold text-ink-950">
+              {data.waitlist_count}
+            </div>
+          </div>
+          <div className={`rounded-[1.5rem] px-4 py-3 ${allSettled ? 'bg-emerald-50' : 'bg-slate-50'}`}>
+            <div className={`text-xs font-semibold uppercase tracking-[0.16em] ${allSettled ? 'text-emerald-700' : 'text-ink-700'}`}>
+              Still owed
+            </div>
+            <div className={`mt-1 text-base font-semibold ${allSettled ? 'text-emerald-700' : 'text-ink-950'}`}>
+              {allSettled ? 'All paid' : `$${amountOwed.toFixed(2)}`}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row">
+          <Link
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+            to={`/admin/sessions/${session.id}`}
+          >
+            Open details
+          </Link>
+          <Button
+            onClick={() => void handleDelete(data)}
+            type="button"
+            variant="danger"
+          >
+            Delete
+          </Button>
+        </div>
+      </article>
     )
   }
 
@@ -280,7 +233,7 @@ export default function AdminSessionList() {
             </div>
             <h2 className="text-2xl font-semibold text-ink-950">Upcoming sessions</h2>
             <p className="text-sm text-ink-700">
-              Expand a card for court pricing and roster controls without leaving the list.
+              View signups, waitlist, and outstanding payments at a glance.
             </p>
           </div>
           <Button onClick={() => setShowForm(true)} type="button">
