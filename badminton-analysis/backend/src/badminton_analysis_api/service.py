@@ -54,52 +54,15 @@ ANALYZING_PROGRESS_STEPS: list[tuple[int, str]] = [
 
 
 
-def _build_setup_frame_url(match_type: MatchType, analysis_id: str) -> str:
-    match_label = match_type.value.replace("_", " ").title()
-    svg = f"""
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
-      <defs>
-        <linearGradient id="court" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#183221"/>
-          <stop offset="100%" stop-color="#2f6a44"/>
-        </linearGradient>
-        <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#f7eee4"/>
-          <stop offset="100%" stop-color="#ecd4bb"/>
-        </linearGradient>
-      </defs>
-      <rect width="1280" height="720" rx="44" fill="url(#frame)" />
-      <rect x="160" y="110" width="960" height="500" rx="32" fill="url(#court)" />
-      <rect
-        x="220"
-        y="150"
-        width="840"
-        height="420"
-        rx="18"
-        fill="none"
-        stroke="#fef7ef"
-        stroke-width="8"
-      />
-      <line x1="640" y1="150" x2="640" y2="570" stroke="#fef7ef" stroke-width="6" />
-      <line x1="220" y1="360" x2="1060" y2="360" stroke="#fef7ef" stroke-width="6" />
-      <text
-        x="96"
-        y="92"
-        fill="#183221"
-        font-size="38"
-        font-family="Avenir Next, sans-serif"
-      >{match_label}</text>
-      <text
-        x="96"
-        y="650"
-        fill="#183221"
-        font-size="26"
-        font-family="Avenir Next, sans-serif"
-      >Analysis {analysis_id[:8]}</text>
-      <circle cx="430" cy="470" r="26" fill="#f26b3a" />
-      <circle cx="840" cy="278" r="26" fill="#f9d8b8" stroke="#183221" stroke-width="6" />
-    </svg>
-    """.strip()
+def _build_setup_frame_url(analysis_id: str) -> str:
+    """Minimal fallback data-URI when no media pipeline produced a real frame."""
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">'
+        '<rect width="1280" height="720" rx="40" fill="#f0f4f8"/>'
+        '<text x="640" y="360" text-anchor="middle" fill="#64748b" font-size="32"'
+        ' font-family="sans-serif">Setup frame unavailable</text>'
+        "</svg>"
+    )
     encoded = b64encode(svg.encode("utf-8")).decode("ascii")
     return f"data:image/svg+xml;base64,{encoded}"
 
@@ -204,7 +167,7 @@ class AnalysisService:
 
     def get_setup(self, analysis_id: str, *, owner_id: str | None = None) -> AnalysisSetupResponse:
         record = self._get_record(analysis_id, owner_id=owner_id)
-        setup_frame_url = _build_setup_frame_url(record.match_type, record.analysis_id)
+        setup_frame_url = _build_setup_frame_url(record.analysis_id)
         if record.setup_frame_path is not None:
             setup_frame_url = f"/api/analyses/{record.analysis_id}/setup-frame"
         return AnalysisSetupResponse(
