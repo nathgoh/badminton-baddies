@@ -99,10 +99,6 @@ export default function AdminSessionDetail() {
                   <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
                     {data.session.name}
                   </h1>
-                  <p className="text-sm text-slate-200 sm:text-base">
-                    {formatDisplayDate(data.session.date)} · {data.confirmed_count} confirmed ·{' '}
-                    {data.waitlist_count} waitlisted
-                  </p>
                 </div>
               </div>
 
@@ -126,15 +122,12 @@ export default function AdminSessionDetail() {
               </div>
               <div className="rounded-[1.5rem] border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
-                  Capacity
+                  Signed up
                 </div>
-                <div className="mt-2 text-lg font-semibold">{data.total_capacity} spots</div>
-              </div>
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
-                  Confirmed
+                <div className="mt-2 text-lg font-semibold">
+                  {data.confirmed_count}
+                  <span className="text-sm font-normal text-slate-300"> / {data.total_capacity}</span>
                 </div>
-                <div className="mt-2 text-lg font-semibold">{data.confirmed_count}</div>
               </div>
               <div className="rounded-[1.5rem] border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
