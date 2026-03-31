@@ -117,29 +117,11 @@ export default function CostCalculator({ data, onRefresh }: Props) {
                 onSubmit={handleSaveCourt}
               >
                 <div className="space-y-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="space-y-1">
-                      <div className="text-lg font-semibold text-ink-950">{court.name}</div>
-                      <div className="text-sm text-ink-700">
-                        {formatTime(court.start_time)} - {formatTime(court.end_time)} · max{' '}
-                        {court.max_players} · ${court.total_cost}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                      <Button type="submit" variant="secondary">
-                        Save
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingCourtId(null)
-                          setEditValues(null)
-                        }}
-                      >
-                        Cancel
-                      </Button>
+                  <div className="space-y-1">
+                    <div className="text-lg font-semibold text-ink-950">{court.name}</div>
+                    <div className="text-sm text-ink-700">
+                      {formatTime(court.start_time)} - {formatTime(court.end_time)} · max{' '}
+                      {court.max_players} · ${court.total_cost}
                     </div>
                   </div>
 
@@ -196,6 +178,17 @@ export default function CostCalculator({ data, onRefresh }: Props) {
                         }
                       />
                     </label>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button type="submit" variant="secondary">Save</Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => { setEditingCourtId(null); setEditValues(null) }}
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 </div>
               </form>
