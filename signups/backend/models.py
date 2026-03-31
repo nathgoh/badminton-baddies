@@ -2,7 +2,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SignupStatus(str, Enum):
@@ -52,7 +52,7 @@ class CourtCreate(BaseModel):
     start_time: str
     end_time: str
     max_players: int
-    total_cost: float
+    total_cost: float = Field(ge=0)
 
 
 class CourtUpdate(BaseModel):
@@ -60,7 +60,7 @@ class CourtUpdate(BaseModel):
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     max_players: Optional[int] = None
-    total_cost: Optional[float] = None
+    total_cost: Optional[float] = Field(default=None, ge=0)
 
 
 class Signup(BaseModel):
@@ -86,7 +86,7 @@ class SignupCreate(BaseModel):
 
 class SignupUpdate(BaseModel):
     status: Optional[SignupStatus] = None
-    amount_owed: Optional[float] = None
+    amount_owed: Optional[float] = Field(default=None, ge=0)
     amount_adjusted: Optional[bool] = None
     cancelled_at: Optional[datetime] = None
     paid: Optional[bool] = None

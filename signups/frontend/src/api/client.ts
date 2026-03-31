@@ -1,7 +1,6 @@
 import type {
   AdminSessionResponse,
   CancelLookupResponse,
-  CostCalculationResult,
   Court,
   Player,
   PlayerLookupResponse,
@@ -149,12 +148,6 @@ export async function getAdminSession(id: string): Promise<AdminSessionResponse>
   return request(`/api/admin/sessions/${id}`)
 }
 
-export async function calculateCosts(
-  sessionId: string,
-): Promise<CostCalculationResult> {
-  return request(`/api/admin/sessions/${sessionId}/calculate-costs`, { method: 'POST' })
-}
-
 export async function updateSignupAmount(
   signupId: string,
   amount: number,
@@ -197,4 +190,3 @@ export async function updatePlayer(
     body: JSON.stringify(data),
   })
 }
-

@@ -9,12 +9,17 @@ describe('AdminSessionDetail structure hooks', () => {
   })
 
   it('preserves the session controls and refresh workflow markers', () => {
-    expect(AdminSessionDetailSource).toContain('handleToggleActive')
-    expect(AdminSessionDetailSource).toContain('handleCalculate')
-    expect(AdminSessionDetailSource).toContain('CostCalculator')
-    expect(AdminSessionDetailSource).toContain('RosterManager')
-    expect(AdminSessionDetailSource).toContain('calculateCosts')
-    expect(AdminSessionDetailSource).toContain('updateSession')
+    expect(AdminSessionDetailSource).toMatch(
+      /async function handleToggleActive\(\) \{[\s\S]*await updateSession\([\s\S]*await load\(\)[\s\S]*\}/,
+    )
+    expect(AdminSessionDetailSource).toContain(`async function handleRefresh() {
+    try {
+      await load()`)
+    expect(AdminSessionDetailSource).toContain('CostCalculator data={data} onRefresh={handleRefresh}')
+    expect(AdminSessionDetailSource).toContain('RosterManager signups={data.signups} onRefresh={handleRefresh}')
+    expect(AdminSessionDetailSource).not.toContain('handleCalculate')
+    expect(AdminSessionDetailSource).not.toContain('calculateCosts')
+    expect(AdminSessionDetailSource).not.toContain('Calculate & assign costs')
   })
 
   it('keeps a single conditional status badge expression', () => {
