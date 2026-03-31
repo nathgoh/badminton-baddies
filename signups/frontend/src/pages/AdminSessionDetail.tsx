@@ -176,25 +176,23 @@ export default function AdminSessionDetail() {
                 </div>
               </div>
 
-              <div className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/8 p-4 backdrop-blur-sm lg:content-between lg:p-5 xl:col-span-2">
-                <div className="space-y-3">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
-                      Actions
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-100">
-                      Use these controls to normalize the roster split or close public signup access.
-                    </p>
+              <div className="space-y-4 rounded-[1.5rem] border border-white/10 bg-white/8 p-4 backdrop-blur-sm lg:p-5 xl:col-span-2">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                    Actions
                   </div>
-                  <Button
-                    className="w-full border-amber-300 bg-amber-400 text-ink-950 hover:bg-amber-300 focus-visible:ring-amber-200"
-                    onClick={() => void handleResetCosts()}
-                    disabled={resettingCosts || data.confirmed_count === 0}
-                    type="button"
-                  >
-                    {resettingCosts ? 'Resetting...' : 'Reset all to even split'}
-                  </Button>
+                  <p className="mt-2 text-sm leading-6 text-slate-100">
+                    Use these controls to normalize the roster split or close public signup access.
+                  </p>
                 </div>
+                <Button
+                  className="w-full border-amber-300 bg-amber-400 text-ink-950 hover:bg-amber-300 focus-visible:ring-amber-200"
+                  onClick={() => void handleResetCosts()}
+                  disabled={resettingCosts || data.confirmed_count === 0}
+                  type="button"
+                >
+                  {resettingCosts ? 'Resetting...' : 'Reset all to even split'}
+                </Button>
                 <Button
                   className="w-full border-white/20 bg-white/10 text-white hover:bg-white/20 focus-visible:ring-white/30"
                   onClick={() => void handleToggleActive()}
