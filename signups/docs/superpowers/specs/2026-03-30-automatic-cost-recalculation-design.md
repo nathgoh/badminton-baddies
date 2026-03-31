@@ -86,7 +86,15 @@ If the signup lands on the waitlist, do not recalculate because the confirmed-pl
 
 ### Cancellation
 
-When a confirmed signup is cancelled, recalculate immediately after persisting the cancellation.
+When a confirmed signup is cancelled, the backend should treat cancellation plus any automatic waitlist promotion as one combined roster-change event.
+
+The sequence should be:
+
+1. persist the cancellation
+2. auto-promote the next waitlisted signup if one exists
+3. recalculate once against the final confirmed roster
+
+If no promotion occurs, recalculate once against the reduced confirmed roster.
 
 If a waitlisted signup is cancelled, no recalculation is needed because confirmed allocation is unchanged.
 
@@ -167,7 +175,8 @@ Required coverage:
 
 - confirmed signup triggers recalculation
 - waitlist signup does not trigger recalculation
-- confirmed cancellation triggers recalculation
+- confirmed cancellation triggers exactly one recalculation against the final post-cancellation roster
+- confirmed cancellation with auto-promotion triggers exactly one recalculation against the final post-promotion roster
 - waitlist cancellation does not trigger recalculation
 - waitlist promotion triggers recalculation
 - manual owed edit redistributes the remainder across unadjusted confirmed players
