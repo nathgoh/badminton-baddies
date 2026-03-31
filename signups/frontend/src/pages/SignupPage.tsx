@@ -85,8 +85,8 @@ export default function SignupPage() {
         className="relative overflow-hidden rounded-[2rem] bg-ink-950 px-5 py-6 text-white shadow-soft sm:px-8 sm:py-8"
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.18),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(245,158,11,0.24),_transparent_30%)]" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl space-y-3">
+        <div className="relative flex items-start justify-between gap-4">
+          <div className="min-w-0 space-y-3">
             <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sand-50">
               {chipLabel}
             </div>
@@ -95,7 +95,7 @@ export default function SignupPage() {
               <p className="text-base text-slate-200 sm:text-lg">{displayDate}</p>
             </div>
           </div>
-          <Card className="relative max-w-sm border-sand-100 bg-white/95 text-ink-950">
+          <Card className="relative shrink-0 border-sand-100 bg-white/95 text-ink-950">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">Availability</p>
             <div className="mt-3 flex items-end gap-2">
               <span className="text-4xl font-semibold">{confirmed_count}</span>
