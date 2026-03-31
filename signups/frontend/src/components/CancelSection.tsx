@@ -67,11 +67,11 @@ export default function CancelSection({ token, expanded, onToggle, onCancelled }
         onClick={onToggle}
         className="flex w-full items-center justify-between gap-4 rounded-[1.5rem] border border-sand-100 bg-sand-50/80 px-4 py-3 text-left"
       >
-        <span className="space-y-1">
-          <span className="block text-sm font-semibold text-ink-950">Already signed up?</span>
-          <span className="block text-sm text-ink-700">Manage your signup</span>
+        <span className="text-sm">
+          <span className="font-semibold text-ink-950">Already signed up?</span>
+          <span className="text-ink-700"> Manage your signup</span>
         </span>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-ink-700">
+        <span className="rounded-full bg-ink-950 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-white">
           {expanded ? 'Hide' : 'Open'}
         </span>
       </Button>
