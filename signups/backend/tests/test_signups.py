@@ -200,3 +200,28 @@ def test_cancel_with_no_waitlist_does_not_error(client):
 
     assert response.status_code == 200
     assert response.json()["status"] == "cancelled"
+
+
+def test_cancel_with_waitlist_promotion_does_not_persist_when_recalculation_would_fail(client):
+    session = _make_session(client)  # capacity = 2
+    token = session["access_token"]
+    _signup(client, token, email="a@test.com", name="Alice")
+    bob = _signup(client, token, email="b@test.com", name="Bob").json()
+    carol = _signup(client, token, email="c@test.com", name="Carol").json()
+
+    patch_response = client.patch(
+        f"/api/admin/signups/{carol['id']}",
+        json={"amount_owed": 100.0, "amount_adjusted": True},
+    )
+    assert patch_response.status_code == 200
+
+    response = client.post(
+        f"/api/public/{token}/cancel",
+        json={"signup_id": bob["id"], "email": "b@test.com"},
+    )
+
+    assert response.status_code == 400
+    public_response = client.get(f"/api/public/{token}")
+    signups = {signup["email"]: signup for signup in public_response.json()["signups"]}
+    assert signups["b@test.com"]["status"] == "confirmed"
+    assert signups["c@test.com"]["status"] == "waitlist"

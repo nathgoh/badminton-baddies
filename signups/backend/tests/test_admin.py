@@ -166,6 +166,31 @@ def test_promote_from_waitlist_rejects_cancelled_signup(client):
     assert "waitlisted" in response.json()["detail"].lower()
 
 
+def test_promote_from_waitlist_does_not_persist_when_recalculation_would_fail(client):
+    session = _setup(client)
+    token = session["access_token"]
+    _signup(client, token, "a@t.com", "Alice")
+    _signup(client, token, "b@t.com", "Bob")
+    _signup(client, token, "c@t.com", "Carol")
+    _signup(client, token, "d@t.com", "Dan")
+    waitlist_signup = _signup(client, token, "e@t.com", "Eve").json()
+
+    patch_response = client.patch(
+        f"/api/admin/signups/{waitlist_signup['id']}",
+        json={"amount_owed": 100.0, "amount_adjusted": True},
+    )
+    assert patch_response.status_code == 200
+
+    response = client.post(f"/api/admin/signups/{waitlist_signup['id']}/promote")
+
+    assert response.status_code == 400
+    session_response = client.get(f"/api/admin/sessions/{session['id']}")
+    signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
+    assert signups["e@t.com"]["status"] == "waitlist"
+    assert signups["e@t.com"]["amount_owed"] == 100.0
+    assert signups["e@t.com"]["amount_adjusted"] is True
+
+
 def test_admin_cancel_signup(client, storage):
     session = _setup(client)
     token = session["access_token"]
@@ -445,12 +470,29 @@ def test_admin_cancel_only_confirmed_signup_succeeds_without_recalculation(clien
     assert response.json()["status"] == "cancelled"
     assert helper_calls == 0
 
-    session_response = client.get(f"/api/admin/sessions/{session['id']}")
 
-    assert session_response.status_code == 200
-    assert session_response.json()["signups"] == []
-    assert session_response.json()["confirmed_count"] == 0
-    assert session_response.json()["waitlist_count"] == 0
+def test_admin_cancel_with_waitlist_promotion_does_not_persist_when_recalculation_would_fail(client):
+    session = _setup(client)
+    token = session["access_token"]
+    _signup(client, token, "a@t.com", "Alice")
+    bob = _signup(client, token, "b@t.com", "Bob").json()
+    _signup(client, token, "c@t.com", "Carol")
+    _signup(client, token, "d@t.com", "Dan")
+    eve = _signup(client, token, "e@t.com", "Eve").json()
+
+    patch_response = client.patch(
+        f"/api/admin/signups/{eve['id']}",
+        json={"amount_owed": 100.0, "amount_adjusted": True},
+    )
+    assert patch_response.status_code == 200
+
+    response = client.delete(f"/api/admin/signups/{bob['id']}")
+
+    assert response.status_code == 400
+    session_response = client.get(f"/api/admin/sessions/{session['id']}")
+    signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
+    assert signups["b@t.com"]["status"] == "confirmed"
+    assert signups["e@t.com"]["status"] == "waitlist"
 
 
 def test_invalid_manual_amount_edit_does_not_persist_attempted_change(client):

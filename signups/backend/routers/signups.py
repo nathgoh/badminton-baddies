@@ -18,7 +18,7 @@ try:
         SignupUpdate,
     )
     from ..storage.adapter import StorageAdapter
-    from .admin import _recalculate_session_costs
+    from .admin import _recalculate_session_costs, _validate_projected_confirmed_costs
 except ImportError:
     from dependencies import get_storage
     from models import (
@@ -33,7 +33,7 @@ except ImportError:
         SignupUpdate,
     )
     from storage.adapter import StorageAdapter
-    from routers.admin import _recalculate_session_costs
+    from routers.admin import _recalculate_session_costs, _validate_projected_confirmed_costs
 
 
 router = APIRouter()
@@ -57,6 +57,13 @@ def _cancellation_cutoff(session_datetime_date, cancel_window_hours: int) -> dat
 
 
 def _promote_next_from_waitlist(session_id: str, storage: StorageAdapter) -> Optional[Signup]:
+    waitlisted = _next_waitlisted_signup(session_id, storage)
+    if waitlisted is not None:
+        return storage.update_signup(waitlisted.id, SignupUpdate(status=SignupStatus.confirmed))
+    return None
+
+
+def _next_waitlisted_signup(session_id: str, storage: StorageAdapter) -> Optional[Signup]:
     courts = storage.get_courts(session_id)
     total_capacity = sum(court.max_players for court in courts)
     signups = storage.get_signups(session_id)
@@ -67,7 +74,7 @@ def _promote_next_from_waitlist(session_id: str, storage: StorageAdapter) -> Opt
             key=lambda s: s.timestamp,
         )
         if waitlisted:
-            return storage.update_signup(waitlisted[0].id, SignupUpdate(status=SignupStatus.confirmed))
+            return waitlisted[0]
     return None
 
 
@@ -183,11 +190,34 @@ def cancel_signup(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancellation window has closed")
 
     was_confirmed = signup.status == SignupStatus.confirmed
+    promoted = None
+    if was_confirmed:
+        signups = storage.get_signups(session.id)
+        total_capacity = sum(court.max_players for court in storage.get_courts(session.id))
+        confirmed_count = sum(1 for item in signups if item.status == SignupStatus.confirmed)
+        if confirmed_count - 1 < total_capacity:
+            waitlisted = sorted(
+                [item for item in signups if item.status == SignupStatus.waitlist],
+                key=lambda item: item.timestamp,
+            )
+            if waitlisted:
+                promoted = waitlisted[0]
+
+        projected_confirmed = [
+            item for item in signups
+            if item.status == SignupStatus.confirmed and item.id != signup.id
+        ]
+        if promoted is not None:
+            projected_confirmed.append(promoted.model_copy(update={"status": SignupStatus.confirmed}))
+        if projected_confirmed:
+            _validate_projected_confirmed_costs(session.id, storage, projected_confirmed)
+
     cancelled = storage.update_signup(
         signup.id,
         SignupUpdate(status=SignupStatus.cancelled, cancelled_at=datetime.now(timezone.utc)),
     )
-    _promote_next_from_waitlist(session.id, storage)
+    if promoted is not None:
+        storage.update_signup(promoted.id, SignupUpdate(status=SignupStatus.confirmed))
     if was_confirmed and any(
         item.status == SignupStatus.confirmed for item in storage.get_signups(session.id)
     ):
