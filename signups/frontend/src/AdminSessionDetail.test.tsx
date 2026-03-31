@@ -12,7 +12,9 @@ describe('AdminSessionDetail structure hooks', () => {
     expect(AdminSessionDetailSource).toMatch(
       /async function handleToggleActive\(\) \{[\s\S]*await updateSession\([\s\S]*await load\(\)[\s\S]*\}/,
     )
-    expect(AdminSessionDetailSource).toMatch(/async function handleRefresh\(\) \{[\s\S]*await load\(\)[\s\S]*\}/)
+    expect(AdminSessionDetailSource).toContain(`async function handleRefresh() {
+    try {
+      await load()`)
     expect(AdminSessionDetailSource).toContain('CostCalculator data={data} onRefresh={handleRefresh}')
     expect(AdminSessionDetailSource).toContain('RosterManager signups={data.signups} onRefresh={handleRefresh}')
     expect(AdminSessionDetailSource).not.toContain('handleCalculate')
