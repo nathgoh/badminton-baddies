@@ -77,7 +77,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
 
   function startEditingAmount(signup: Signup) {
     setEditingId(signup.id)
-    setEditAmount(signup.amount_owed != null ? String(signup.amount_owed) : '')
+    setEditAmount(signup.amount_owed != null ? signup.amount_owed.toFixed(2) : '')
   }
 
   return (
