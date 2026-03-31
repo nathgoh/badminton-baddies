@@ -16,6 +16,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState('')
   const [originalAmount, setOriginalAmount] = useState('')
+  const [optimisticPaid, setOptimisticPaid] = useState<Record<string, boolean>>({})
 
   async function handleSaveAmount(signupId: string) {
     await updateSignupAmount(signupId, parseFloat(editAmount))
@@ -29,6 +30,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
   }
 
   async function handleTogglePaid(signupId: string, currentPaid: boolean) {
+    setOptimisticPaid((prev) => ({ ...prev, [signupId]: !currentPaid }))
     await markSignupPaid(signupId, !currentPaid)
     onRefresh()
   }
@@ -61,12 +63,13 @@ export default function RosterManager({ signups, onRefresh }: Props) {
         <div className="space-y-3" data-testid="roster-list">
           {confirmed.map((signup) => {
             const isEditing = editingId === signup.id
+            const isPaid = optimisticPaid[signup.id] ?? signup.paid
 
             return (
               <article
                 key={signup.id}
                 className={`rounded-[1.5rem] border p-4 transition duration-150 hover:scale-[1.01] hover:shadow-md ${
-                  signup.paid
+                  isPaid
                     ? 'border-emerald-200 bg-emerald-50'
                     : 'border-slate-200 bg-slate-50/70'
                 }`}
@@ -76,14 +79,14 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                   type="button"
                   className="w-full text-left"
                   data-testid="roster-payment-toggle"
-                  onClick={() => void handleTogglePaid(signup.id, signup.paid)}
+                  onClick={() => void handleTogglePaid(signup.id, isPaid)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
-                      <div className={`text-lg font-semibold ${signup.paid ? 'text-emerald-900' : 'text-ink-950'}`}>
+                      <div className={`text-lg font-semibold ${isPaid ? 'text-emerald-900' : 'text-ink-950'}`}>
                         {signup.name}
                       </div>
-                      <div className={`break-all text-sm ${signup.paid ? 'text-emerald-700' : 'text-ink-700'}`}>
+                      <div className={`break-all text-sm ${isPaid ? 'text-emerald-700' : 'text-ink-700'}`}>
                         {signup.email}
                       </div>
                     </div>
@@ -106,7 +109,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                           className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition hover:opacity-80 ${
                             signup.amount_adjusted
                               ? 'bg-amber-100 text-amber-800'
-                              : signup.paid
+                              : isPaid
                               ? 'bg-emerald-200 text-emerald-900'
                               : 'bg-emerald-100 text-emerald-800'
                           }`}
