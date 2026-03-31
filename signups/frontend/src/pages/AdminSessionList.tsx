@@ -458,14 +458,15 @@ export default function AdminSessionList() {
           {upcomingSessions.map(renderCard)}
         </div>
 
-        <Card className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div className="space-y-1">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">
+        <div className="relative overflow-hidden rounded-[1.5rem] bg-ink-950 px-5 py-5 text-white sm:px-6">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.08),_transparent_40%)]" />
+          <div className="relative space-y-1">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
               History
             </div>
-            <h2 className="text-2xl font-semibold text-ink-950">Past sessions</h2>
+            <h2 className="text-2xl font-semibold">Past sessions</h2>
           </div>
-        </Card>
+        </div>
 
         <div className="grid gap-4">
           {pastSessions.length === 0 ? (
