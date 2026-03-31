@@ -416,9 +416,6 @@ export default function AdminSessionList() {
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button type="submit">Create session</Button>
-              <Button onClick={() => setShowForm(false)} type="button" variant="secondary">
-                Cancel
-              </Button>
             </div>
           </Card>
         ) : null}
