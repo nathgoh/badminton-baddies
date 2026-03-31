@@ -53,6 +53,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
           <div className="text-2xl font-semibold text-ink-950">
             {confirmed.length} confirmed player{confirmed.length === 1 ? '' : 's'}
           </div>
+          <p className="text-xs text-ink-500">Tap card to mark paid · Tap amount to edit</p>
         </div>
         <div className="space-y-3" data-testid="roster-list">
           {confirmed.map((signup) => {
@@ -61,54 +62,62 @@ export default function RosterManager({ signups, onRefresh }: Props) {
             return (
               <article
                 key={signup.id}
-                className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4"
+                className={`rounded-[1.5rem] border p-4 transition ${
+                  signup.paid
+                    ? 'border-emerald-200 bg-emerald-50'
+                    : 'border-slate-200 bg-slate-50/70'
+                }`}
                 data-testid="roster-item"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
-                    <div className="text-lg font-semibold text-ink-950">{signup.name}</div>
-                    <div className="break-all text-sm text-ink-700">{signup.email}</div>
+                <button
+                  type="button"
+                  className="w-full text-left"
+                  data-testid="roster-payment-toggle"
+                  onClick={() => void handleTogglePaid(signup.id, signup.paid)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <div className={`text-lg font-semibold ${signup.paid ? 'text-emerald-900' : 'text-ink-950'}`}>
+                        {signup.name}
+                      </div>
+                      <div className={`break-all text-sm ${signup.paid ? 'text-emerald-700' : 'text-ink-700'}`}>
+                        {signup.email}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editAmount}
+                          onChange={(event) => setEditAmount(event.target.value)}
+                          className="w-full rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 sm:max-w-[140px]"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition hover:opacity-80 ${
+                            signup.amount_adjusted
+                              ? 'bg-amber-100 text-amber-800'
+                              : signup.paid
+                              ? 'bg-emerald-200 text-emerald-900'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                          onClick={(e) => { e.stopPropagation(); startEditingAmount(signup) }}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); startEditingAmount(signup) } }}
+                        >
+                          {signup.amount_owed != null ? `$${signup.amount_owed.toFixed(2)}` : '—'}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                </button>
 
-                  <div className="flex shrink-0 items-center">
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={editAmount}
-                        onChange={(event) => setEditAmount(event.target.value)}
-                        className="w-full rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 sm:max-w-[140px]"
-                        autoFocus
-                      />
-                    ) : (
-                      <span
-                        className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                          signup.amount_adjusted
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {signup.amount_owed != null ? `$${signup.amount_owed.toFixed(2)}` : '—'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 pt-1 sm:flex-row">
-                  <Button
-                    type="button"
-                    className={`${
-                      signup.paid
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                        : ''
-                    }`}
-                    data-testid="roster-payment-toggle"
-                    onClick={() => void handleTogglePaid(signup.id, signup.paid)}
-                    variant="secondary"
-                  >
-                    {signup.paid ? 'Paid' : 'Unpaid'}
-                  </Button>
-
+                <div className="flex flex-col gap-3 pt-3 sm:flex-row">
                   {isEditing ? (
                     <Button
                       type="button"
@@ -117,16 +126,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                     >
                       Save
                     </Button>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => startEditingAmount(signup)}
-                    >
-                      Edit
-                    </Button>
-                  )}
-
+                  ) : null}
                   <Button
                     type="button"
                     variant="danger"
