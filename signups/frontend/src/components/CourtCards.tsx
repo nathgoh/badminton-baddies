@@ -71,7 +71,7 @@ export default function CourtCards({
         {courts.map((court) => (
           <div
             key={court.id}
-            className="flex flex-col gap-2 rounded-[1.5rem] border border-sand-100 bg-white/80 px-4 py-3 text-sm text-ink-700 sm:flex-row sm:items-center sm:justify-between"
+            className="flex items-center justify-between gap-2 rounded-[1.5rem] border border-sand-100 bg-white/80 px-4 py-3 text-sm text-ink-700"
           >
             <span className="font-medium text-ink-950">
               <strong>{court.name}</strong> · {formatTime(court.start_time)} - {formatTime(court.end_time)}
