@@ -345,3 +345,76 @@ test("renders the expanded coach and analytics report sections from the revised 
   expect(screen.getByText(/front-left/i)).toBeInTheDocument();
   expect(screen.getByText(/evidence/i)).toBeInTheDocument();
 });
+
+test("analyze another video button resets to the analyze screen", async () => {
+  queueFetchResponses([
+    {
+      status: 201,
+      body: {
+        analysis_id: "analysis-123",
+        youtube_url: "https://www.youtube.com/watch?v=badminton-demo",
+        match_type: "mixed_doubles",
+        selection_required: true,
+        stage: "setup_required",
+        created_at: "2026-03-30T20:00:00Z",
+      },
+    },
+    { body: setupResponse },
+    {
+      status: 202,
+      body: {
+        analysis_id: "analysis-123",
+        stage: "ready_to_run",
+        message: "Player selection saved.",
+      },
+    },
+    {
+      status: 202,
+      body: {
+        analysis_id: "analysis-123",
+        stage: "analyzing",
+        message: "Analysis started.",
+      },
+    },
+    {
+      body: {
+        analysis_id: "analysis-123",
+        stage: "completed",
+        progress_percent: 100,
+        message: "Report generated successfully.",
+        warnings: [],
+        error_details: null,
+      },
+    },
+    { body: completedReport },
+  ]);
+
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: /create analysis/i }));
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: /player 1/i })).toBeInTheDocument();
+  });
+
+  vi.useFakeTimers();
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /player 1/i }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /save setup and run/i }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+    await flushMicrotasks();
+  });
+
+  expect(screen.getByText(/late recoveries still leak attacking quality/i)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /analyze another video/i }));
+
+  expect(screen.getByRole("heading", { name: /start an analysis/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /create analysis/i })).toBeInTheDocument();
+});
