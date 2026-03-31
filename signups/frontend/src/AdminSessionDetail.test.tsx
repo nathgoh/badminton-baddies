@@ -10,11 +10,12 @@ describe('AdminSessionDetail structure hooks', () => {
 
   it('preserves the session controls and refresh workflow markers', () => {
     expect(AdminSessionDetailSource).toContain('handleToggleActive')
-    expect(AdminSessionDetailSource).toContain('handleCalculate')
-    expect(AdminSessionDetailSource).toContain('CostCalculator')
+    expect(AdminSessionDetailSource).toContain('void load()')
     expect(AdminSessionDetailSource).toContain('RosterManager')
-    expect(AdminSessionDetailSource).toContain('calculateCosts')
     expect(AdminSessionDetailSource).toContain('updateSession')
+    expect(AdminSessionDetailSource).not.toContain('handleCalculate')
+    expect(AdminSessionDetailSource).not.toContain('calculateCosts')
+    expect(AdminSessionDetailSource).not.toContain('Calculate & assign costs')
   })
 
   it('keeps a single conditional status badge expression', () => {

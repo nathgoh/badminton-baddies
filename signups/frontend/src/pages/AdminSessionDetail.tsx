@@ -5,7 +5,7 @@ import CostCalculator from '../components/CostCalculator'
 import RosterManager from '../components/RosterManager'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
-import { calculateCosts, getAdminSession, updateSession } from '../api/client'
+import { getAdminSession, updateSession } from '../api/client'
 import { formatDisplayDate } from '../utils'
 import type { AdminSessionResponse } from '../types'
 
@@ -13,8 +13,6 @@ export default function AdminSessionDetail() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<AdminSessionResponse | null>(null)
   const [toggling, setToggling] = useState(false)
-  const [calculating, setCalculating] = useState(false)
-  const [result, setResult] = useState<{ base_amount: number } | null>(null)
 
   async function load() {
     if (!id) {
@@ -37,20 +35,6 @@ export default function AdminSessionDetail() {
       alert(error instanceof Error ? error.message : String(error))
     } finally {
       setToggling(false)
-    }
-  }
-
-  async function handleCalculate() {
-    if (!data) return
-    setCalculating(true)
-    try {
-      const response = await calculateCosts(data.session.id)
-      setResult(response)
-      void load()
-    } catch (error) {
-      alert(error instanceof Error ? error.message : String(error))
-    } finally {
-      setCalculating(false)
     }
   }
 
@@ -159,44 +143,31 @@ export default function AdminSessionDetail() {
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-end">
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-end">
+              <Card className="border-white/10 bg-white/10 p-4 text-white backdrop-blur-sm">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
-                  Cost split
+                  Cost updates
                 </div>
-                <div className="mt-3 space-y-3">
-                  <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-white/90 px-4 py-3 text-sm text-ink-700">
-                    <span>Total court cost</span>
-                    <strong className="text-base text-ink-950">${data.total_cost.toFixed(2)}</strong>
-                  </div>
-                  {result ? (
-                    <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      <span>Base per player</span>
-                      <strong className="text-base">${result.base_amount.toFixed(2)}</strong>
-                    </div>
-                  ) : null}
+                <div className="mt-3 space-y-3 text-sm leading-6 text-slate-100">
+                  <p>
+                    Owed amounts update automatically after signup, cancellation, promotion, and
+                    manual adjustments.
+                  </p>
+                  <p className="text-slate-200">
+                    Manual recalculation is no longer required for this session view.
+                  </p>
                 </div>
-              </div>
+              </Card>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Button
-                  className="w-full border-white/20 bg-white/10 text-white hover:bg-white/20 focus-visible:ring-white/30"
-                  onClick={() => void handleToggleActive()}
-                  disabled={toggling}
-                  type="button"
-                  variant="secondary"
-                >
-                  {toggling ? 'Saving...' : data.session.is_active ? 'Close session' : 'Open session'}
-                </Button>
-                <Button
-                  className="w-full border-amber-300 bg-amber-400 text-ink-950 hover:bg-amber-300 focus-visible:ring-amber-200"
-                  onClick={() => void handleCalculate()}
-                  disabled={calculating}
-                  type="button"
-                >
-                  {calculating ? 'Calculating...' : 'Calculate & assign costs'}
-                </Button>
-              </div>
+              <Button
+                className="w-full border-white/20 bg-white/10 text-white hover:bg-white/20 focus-visible:ring-white/30"
+                onClick={() => void handleToggleActive()}
+                disabled={toggling}
+                type="button"
+                variant="secondary"
+              >
+                {toggling ? 'Saving...' : data.session.is_active ? 'Close session' : 'Open session'}
+              </Button>
             </div>
           </div>
         </section>
