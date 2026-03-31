@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import threading
 from base64 import b64encode
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
 from fastapi import HTTPException, status
 
-from ..coaching.engine import CoachFeedbackEngine, PlaceholderCoachFeedbackEngine
-from ..pipelines.cv.pipeline import CVPipeline, _default_court, _default_players, _player_count
-from ..pipelines.media.pipeline import MediaArtifactPipeline, MediaPreparationError
-from ..schemas import (
+from coaching.engine import CoachFeedbackEngine, PlaceholderCoachFeedbackEngine
+from pipelines.cv.pipeline import CVPipeline, _default_court, _default_players, _player_count
+from pipelines.media.pipeline import MediaArtifactPipeline, MediaPreparationError
+from schemas import (
     AnalysisActionResponse,
     AnalysisCreateInput,
     AnalysisCreateResponse,
@@ -25,6 +27,7 @@ from ..schemas import (
     AnalyticsView,
     ConfidenceAnnotation,
     CourtModel,
+    FrameEvent,
     HeatmapCell,
     MatchType,
     MechanicsMetrics,
@@ -38,7 +41,9 @@ from ..schemas import (
     ShotSelectionMetrics,
     TrackingResult,
 )
+
 from .evidence import build_analysis_evidence, build_shuttle_metrics
+from .feed import AnalysisFeedManager
 from .progress import ANALYZING_PROGRESS_STEPS
 from .store import AnalysisStore
 
@@ -101,12 +106,14 @@ class AnalysisService:
         coach_feedback_engine: CoachFeedbackEngine | None = None,
         media_artifact_pipeline: MediaArtifactPipeline | None = None,
         cv_pipeline: CVPipeline | None = None,
+        feed_manager: AnalysisFeedManager | None = None,
     ) -> None:
         self._store = store or AnalysisStore()
         self._coach_feedback_engine = coach_feedback_engine or PlaceholderCoachFeedbackEngine()
         self._fallback_coach_feedback_engine = PlaceholderCoachFeedbackEngine()
         self._media_artifact_pipeline = media_artifact_pipeline
         self._cv_pipeline = cv_pipeline
+        self.feed_manager = feed_manager or AnalysisFeedManager()
 
     def create_analysis(
         self,
@@ -199,6 +206,11 @@ class AnalysisService:
         record.stage = AnalysisStage.READY_TO_RUN
         record.report = None
         record.progress_step = 0
+        record.progress_percent = 0
+        record.status_message = None
+        record.pipeline_stage = None
+        record.frame_index = None
+        record.total_frames = None
         record.warnings = []
         record.error_details = None
         record.selected_track_id = None
@@ -226,15 +238,30 @@ class AnalysisService:
 
         record.stage = AnalysisStage.ANALYZING
         record.progress_step = 0
+        record.progress_percent = 0
+        record.status_message = "Analysis started. Connect to the feed for live updates."
+        record.pipeline_stage = None
+        record.frame_index = None
+        record.total_frames = None
         record.report = None
         record.warnings = []
         record.error_details = None
+        self.feed_manager.reset(record.analysis_id)
         self._store.save(record)
-        return AnalysisActionResponse(
+
+        response = AnalysisActionResponse(
             analysis_id=record.analysis_id,
             stage=record.stage,
-            message="Analysis started. Poll status for progress updates.",
+            message="Analysis started. Connect to the feed for live updates.",
         )
+
+        thread = threading.Thread(
+            target=self._run_analysis_background,
+            args=(record.analysis_id,),
+            daemon=True,
+        )
+        thread.start()
+        return response
 
     def get_status(
         self,
@@ -244,7 +271,7 @@ class AnalysisService:
     ) -> AnalysisStatusResponse:
         record = self._get_record(analysis_id, owner_id=owner_id)
         if record.stage == AnalysisStage.ANALYZING:
-            return self._advance_analysis(record)
+            return self._build_status_response(record)
         return self._build_status_response(record)
 
     def get_report(self, analysis_id: str, *, owner_id: str | None = None) -> AnalysisReport:
@@ -280,6 +307,7 @@ class AnalysisService:
     def delete_analysis(self, analysis_id: str, *, owner_id: str | None = None) -> None:
         record = self._get_record(analysis_id, owner_id=owner_id)
         self._cleanup_media(record)
+        self.feed_manager.discard(analysis_id)
         try:
             self._store.delete(analysis_id)
         except KeyError as exc:
@@ -289,27 +317,89 @@ class AnalysisService:
             ) from exc
 
     def _advance_analysis(self, record: AnalysisRecord) -> AnalysisStatusResponse:
-        if record.progress_step < len(ANALYZING_PROGRESS_STEPS):
-            progress_percent, message = ANALYZING_PROGRESS_STEPS[record.progress_step]
-            record.progress_step += 1
-            self._store.save(record)
-            return AnalysisStatusResponse(
-                analysis_id=record.analysis_id,
-                stage=record.stage,
-                progress_percent=progress_percent,
-                message=message,
-                warnings=record.warnings,
-                error_details=record.error_details,
-            )
+        return self._build_status_response(record)
+
+    def _run_analysis_background(self, analysis_id: str) -> None:
+        try:
+            record = self._store.get(analysis_id)
+        except KeyError:
+            return
 
         try:
             self._complete_analysis(record)
         except Exception as exc:
             record.stage = AnalysisStage.FAILED
             record.error_details = str(exc)
-            record.progress_step = len(ANALYZING_PROGRESS_STEPS)
+            record.progress_percent = 100
+            record.status_message = "Analysis failed. Review the error details and return to setup."
+            record.pipeline_stage = None
+            record.frame_index = None
+            record.total_frames = None
             self._store.save(record)
-        return self._build_status_response(record)
+        finally:
+            self.feed_manager.complete(analysis_id)
+
+    def _push_event(self, record: AnalysisRecord, event: FrameEvent) -> None:
+        self.feed_manager.push(record.analysis_id, event)
+        record.progress_percent = event.progress_percent
+        record.status_message = event.message
+        record.pipeline_stage = event.pipeline_stage
+        record.frame_index = event.frame_index
+        record.total_frames = event.total_frames
+        self._store.save(record)
+
+    def _push_stage_event(
+        self,
+        record: AnalysisRecord,
+        *,
+        stage: str,
+        progress_percent: int,
+        message: str,
+    ) -> None:
+        self._push_event(
+            record,
+            FrameEvent(
+                analysis_id=record.analysis_id,
+                pipeline_stage=stage,
+                frame_index=0,
+                total_frames=1,
+                progress_percent=progress_percent,
+                message=message,
+            ),
+        )
+
+    def _make_frame_callback(
+        self,
+        record: AnalysisRecord,
+        stage: str,
+    ) -> Callable[[int, int, bytes | None], None]:
+        def callback(frame_index: int, total_frames: int, jpeg_bytes: bytes | None) -> None:
+            scaled_progress = (
+                int((frame_index / max(total_frames, 1)) * 100) if total_frames > 0 else 0
+            )
+            if stage == "tracking":
+                progress_percent = int(scaled_progress * 0.6)
+            elif stage == "pose":
+                progress_percent = 60 + int(scaled_progress * 0.25)
+            else:
+                progress_percent = scaled_progress
+
+            self._push_event(
+                record,
+                FrameEvent(
+                    analysis_id=record.analysis_id,
+                    pipeline_stage=stage,
+                    frame_index=frame_index,
+                    total_frames=total_frames,
+                    progress_percent=min(progress_percent, 99),
+                    message=f"{stage.capitalize()}: frame {frame_index}/{total_frames}",
+                    frame_jpeg_base64=(
+                        b64encode(jpeg_bytes).decode("ascii") if jpeg_bytes is not None else None
+                    ),
+                ),
+            )
+
+        return callback
 
     def _complete_analysis(self, record: AnalysisRecord) -> None:
         if record.selected_player_id is None:
@@ -333,6 +423,12 @@ class AnalysisService:
             record.pose_summary = pose_summary
             record.warnings = [*record.warnings, *pose_summary.warnings]
 
+        self._push_stage_event(
+            record,
+            stage="analytics",
+            progress_percent=85,
+            message="Building analytics and evidence...",
+        )
         analytics = self._build_analytics(record.match_type, record.video_duration_seconds)
         analytics = self._apply_cv_analytics(
             analytics,
@@ -348,6 +444,12 @@ class AnalysisService:
             analytics,
             tracking_summary=tracking_summary,
             pose_summary=pose_summary,
+        )
+        self._push_stage_event(
+            record,
+            stage="coaching",
+            progress_percent=92,
+            message="Generating coaching feedback...",
         )
         coach_feedback = self._create_coach_view(
             analytics=analytics,
@@ -373,6 +475,11 @@ class AnalysisService:
         )
         record.stage = AnalysisStage.COMPLETED
         record.progress_step = len(ANALYZING_PROGRESS_STEPS)
+        record.progress_percent = 100
+        record.status_message = "Report generated successfully."
+        record.pipeline_stage = None
+        record.frame_index = None
+        record.total_frames = None
         self._store.save(record)
 
     def _create_coach_view(
@@ -417,14 +524,17 @@ class AnalysisService:
             progress_percent = 25
             message = "Setup confirmed and ready to run."
         elif record.stage == AnalysisStage.ANALYZING:
-            progress_index = max(record.progress_step - 1, 0)
-            progress_percent, message = ANALYZING_PROGRESS_STEPS[progress_index]
+            progress_percent = record.progress_percent
+            message = record.status_message or ANALYZING_PROGRESS_STEPS[0][1]
         elif record.stage == AnalysisStage.COMPLETED:
             progress_percent = 100
-            message = "Report generated successfully."
+            message = record.status_message or "Report generated successfully."
         else:
             progress_percent = 100
-            message = "Analysis failed. Review the error details and return to setup."
+            message = (
+                record.status_message
+                or "Analysis failed. Review the error details and return to setup."
+            )
 
         return AnalysisStatusResponse(
             analysis_id=record.analysis_id,
@@ -433,6 +543,9 @@ class AnalysisService:
             message=message,
             warnings=record.warnings,
             error_details=record.error_details,
+            pipeline_stage=record.pipeline_stage,
+            frame_index=record.frame_index,
+            total_frames=record.total_frames,
         )
 
     def _get_record(self, analysis_id: str, *, owner_id: str | None = None) -> AnalysisRecord:
@@ -529,10 +642,12 @@ class AnalysisService:
         if self._cv_pipeline is None or record.source_video_path is None:
             return TrackingResult(tracks=[], warnings=[])
 
+        on_frame = self._make_frame_callback(record, "tracking")
         raw_result = self._cv_pipeline.track_players(
             record.source_video_path,
             record.court,
             record.match_type,
+            on_frame=on_frame,
         )
         raw_tracks = getattr(raw_result, "tracks", [])
         if isinstance(raw_tracks, dict):
@@ -621,7 +736,12 @@ class AnalysisService:
                 stroke_execution_note="Pose samples were unavailable for the selected player.",
             )
 
-        raw_summary = self._cv_pipeline.extract_pose(record.source_video_path, selected_track)
+        on_frame = self._make_frame_callback(record, "pose")
+        raw_summary = self._cv_pipeline.extract_pose(
+            record.source_video_path,
+            selected_track,
+            on_frame=on_frame,
+        )
         return PoseSummary.model_validate(raw_summary, from_attributes=True)
 
     def _build_analytics(

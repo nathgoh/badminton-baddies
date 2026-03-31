@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from math import exp
 
-from ..schemas import (
+from schemas import (
     AIRationale,
     AnalysisEvidence,
     AnalyticsView,

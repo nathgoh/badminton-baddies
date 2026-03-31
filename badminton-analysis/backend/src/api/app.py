@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncGenerator
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Header, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
-from ..analyses.service import AnalysisService
-from ..coaching.engine import build_coach_feedback_engine_from_env
-from ..pipelines.cv.pipeline import build_cv_pipeline_from_env
-from ..pipelines.media.pipeline import build_media_artifact_pipeline_from_env
-from ..schemas import (
+from analyses.service import AnalysisService
+from coaching.engine import build_coach_feedback_engine_from_env
+from pipelines.cv.pipeline import build_cv_pipeline_from_env
+from pipelines.media.pipeline import build_media_artifact_pipeline_from_env
+from schemas import (
     AnalysisActionResponse,
     AnalysisCreateInput,
     AnalysisCreateResponse,
@@ -20,6 +23,14 @@ from ..schemas import (
     AnalysisSetupResponse,
     AnalysisStatusResponse,
 )
+
+
+def _load_env_file(env_path: Path | None = None) -> None:
+    resolved_env_path = env_path or Path(__file__).resolve().parents[2] / ".env"
+    load_dotenv(resolved_env_path, override=False)
+
+
+_load_env_file()
 
 
 def _env_float(name: str, default: float) -> float:
@@ -138,6 +149,39 @@ def get_status(
     owner_id: str | None = Header(default=None, alias="X-Owner-Id"),
 ) -> AnalysisStatusResponse:
     return service.get_status(analysis_id, owner_id=owner_id)
+
+
+@app.get("/api/analyses/{analysis_id}/feed")
+async def analysis_feed(
+    analysis_id: str,
+    owner_id: str | None = Header(default=None, alias="X-Owner-Id"),
+) -> StreamingResponse:
+    import asyncio
+
+    service.get_status(analysis_id, owner_id=owner_id)
+    queue = service.feed_manager.subscribe(analysis_id)
+
+    async def event_stream() -> AsyncGenerator[str, None]:
+        loop = asyncio.get_running_loop()
+        try:
+            while True:
+                event = await loop.run_in_executor(None, queue.get)
+                if event is None:
+                    yield "event: done\ndata: {}\n\n"
+                    break
+                yield f"data: {event.model_dump_json()}\n\n"
+        finally:
+            service.feed_manager.unsubscribe(analysis_id, queue)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/api/analyses/{analysis_id}/report", response_model=AnalysisReport)

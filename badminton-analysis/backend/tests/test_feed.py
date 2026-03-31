@@ -48,3 +48,25 @@ def test_multiple_subscribers() -> None:
     manager.push("test-1", event)
     assert q1.get_nowait() == event
     assert q2.get_nowait() == event
+
+
+def test_new_subscriber_receives_latest_snapshot() -> None:
+    manager = AnalysisFeedManager()
+    event = _make_event(frame_index=4)
+    manager.push("test-1", event)
+
+    queue = manager.subscribe("test-1")
+
+    assert queue.get_nowait() == event
+
+
+def test_subscribe_after_completion_replays_latest_event_and_done() -> None:
+    manager = AnalysisFeedManager()
+    event = _make_event(frame_index=9)
+    manager.push("test-1", event)
+    manager.complete("test-1")
+
+    queue = manager.subscribe("test-1")
+
+    assert queue.get_nowait() == event
+    assert queue.get_nowait() is None

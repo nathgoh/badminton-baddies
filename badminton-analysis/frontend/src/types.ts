@@ -78,6 +78,19 @@ export interface AnalysisStatusResponse {
   message: string;
   warnings: string[];
   error_details: string | null;
+  pipeline_stage?: string | null;
+  frame_index?: number | null;
+  total_frames?: number | null;
+}
+
+export interface FrameEvent {
+  analysis_id: string;
+  pipeline_stage: string;
+  frame_index: number;
+  total_frames: number;
+  progress_percent: number;
+  message: string;
+  frame_jpeg_base64: string | null;
 }
 
 export interface CoachView {

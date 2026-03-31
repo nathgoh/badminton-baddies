@@ -15,6 +15,7 @@ import {
   fetchStatus,
   runAnalysis,
   saveSelection,
+  subscribeToFeed,
 } from "./api";
 import type {
   AnalysisCreateResponse,
@@ -22,6 +23,7 @@ import type {
   AnalysisSetupResponse,
   AnalysisStatusResponse,
   CourtPoint,
+  FrameEvent,
   HeatmapCell,
   MatchType,
   PlayerCandidate,
@@ -189,6 +191,21 @@ function formatMatchType(matchType: MatchType): string {
   return matchType.replaceAll("_", " ");
 }
 
+function formatPipelineStage(stage: string | null | undefined): string {
+  switch (stage) {
+    case "tracking":
+      return "Player Tracking";
+    case "pose":
+      return "Pose Estimation";
+    case "analytics":
+      return "Analytics";
+    case "coaching":
+      return "Coaching";
+    default:
+      return "Analysis";
+  }
+}
+
 function App() {
   const [screen, setScreen] = useState<Screen>("analyze");
   const [reportTab, setReportTab] = useState<ReportTab>("coach");
@@ -199,6 +216,7 @@ function App() {
   const [courtPoints, setCourtPoints] = useState<CourtPoint[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerCandidate | null>(null);
   const [status, setStatus] = useState<AnalysisStatusResponse | null>(null);
+  const [latestFrame, setLatestFrame] = useState<FrameEvent | null>(null);
   const [report, setReport] = useState<AnalysisReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -227,6 +245,8 @@ function App() {
           if (cancelled) return;
 
           startTransition(() => {
+            setStatus(nextStatus);
+            setLatestFrame(null);
             setReport(nextReport);
             setScreen("report");
           });
@@ -235,6 +255,8 @@ function App() {
 
         if (nextStatus.stage === "failed") {
           startTransition(() => {
+            setStatus(nextStatus);
+            setLatestFrame(null);
             setError(nextStatus.error_details ?? "Analysis failed. Review the setup and try again.");
             setScreen("setup");
           });
@@ -248,6 +270,7 @@ function App() {
         if (cancelled) return;
 
         startTransition(() => {
+          setLatestFrame(null);
           setError(
             pollError instanceof Error
               ? pollError.message
@@ -258,10 +281,74 @@ function App() {
       }
     }
 
-    void pollStatus();
+    const unsubscribe = subscribeToFeed(
+      stableAnalysisId,
+      (frameEvent) => {
+        if (cancelled) return;
+        startTransition(() => {
+          setLatestFrame(frameEvent);
+          setStatus({
+            analysis_id: stableAnalysisId,
+            stage: "analyzing",
+            progress_percent: frameEvent.progress_percent,
+            message: frameEvent.message,
+            warnings: [],
+            error_details: null,
+            pipeline_stage: frameEvent.pipeline_stage,
+            frame_index: frameEvent.frame_index,
+            total_frames: frameEvent.total_frames,
+          });
+        });
+      },
+      async () => {
+        if (cancelled) return;
+        try {
+          const finalStatus = await fetchStatus(stableAnalysisId);
+          if (cancelled) return;
+
+          if (finalStatus.stage === "completed") {
+            const nextReport = await fetchReport(stableAnalysisId);
+            if (cancelled) return;
+
+            startTransition(() => {
+              setStatus(finalStatus);
+              setLatestFrame(null);
+              setReport(nextReport);
+              setScreen("report");
+            });
+            return;
+          }
+
+          if (finalStatus.stage === "failed") {
+            startTransition(() => {
+              setStatus(finalStatus);
+              setLatestFrame(null);
+              setError(finalStatus.error_details ?? "Analysis failed. Review the setup and try again.");
+              setScreen("setup");
+            });
+          }
+        } catch (finalizeError) {
+          if (cancelled) return;
+          startTransition(() => {
+            setLatestFrame(null);
+            setError(
+              finalizeError instanceof Error
+                ? finalizeError.message
+                : "Unable to retrieve analysis results. Review the setup and try again.",
+            );
+            setScreen("setup");
+          });
+        }
+      },
+      () => {
+        if (cancelled) return;
+        void pollStatus();
+      },
+    );
 
     return () => {
       cancelled = true;
+      unsubscribe();
       if (timeoutId !== undefined) {
         window.clearTimeout(timeoutId);
       }
@@ -276,6 +363,7 @@ function App() {
       setCourtPoints([]);
       setSelectedPlayer(null);
       setStatus(null);
+      setLatestFrame(null);
       setReport(null);
       setError(null);
       setReportTab("coach");
@@ -300,6 +388,7 @@ function App() {
         setCourtPoints(nextSetup.court.points);
         setSelectedPlayer(null);
         setStatus(null);
+        setLatestFrame(null);
         setReport(null);
         setReportTab("coach");
         setScreen("setup");
@@ -336,11 +425,16 @@ function App() {
           message: nextRunState.message,
           warnings: [],
           error_details: null,
+          pipeline_stage: null,
+          frame_index: null,
+          total_frames: null,
         });
+        setLatestFrame(null);
         setScreen("processing");
       });
     } catch (runError) {
       startTransition(() => {
+        setLatestFrame(null);
         setError(
           runError instanceof Error
             ? runError.message
@@ -649,6 +743,27 @@ function App() {
           {/* Processing screen */}
           {screen === "processing" ? (
             <div className="grid gap-5">
+              {latestFrame?.frame_jpeg_base64 ? (
+                <div className="relative overflow-hidden rounded-xl bg-black">
+                  <img
+                    alt="Analysis frame"
+                    className="block w-full h-auto"
+                    src={`data:image/jpeg;base64,${latestFrame.frame_jpeg_base64}`}
+                  />
+                  <div className="absolute left-3 top-3 flex gap-2">
+                    <span className="rounded-lg bg-black/70 px-2 py-1 text-xs font-medium text-white">
+                      {formatPipelineStage(latestFrame.pipeline_stage)}
+                    </span>
+                    <span className="rounded-lg bg-black/70 px-2 py-1 text-xs font-mono text-white">
+                      {latestFrame.frame_index}/{latestFrame.total_frames}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-48 items-center justify-center rounded-xl bg-slate-100">
+                  <p className="text-sm text-slate-400">Waiting for first frame...</p>
+                </div>
+              )}
               <div
                 className="w-full h-4 rounded-full bg-slate-100 overflow-hidden"
                 aria-hidden="true"
@@ -663,8 +778,7 @@ function App() {
                   {status?.progress_percent ?? 0}%
                 </strong>
                 <p className="text-sm text-slate-500">
-                  {status?.message ??
-                    "Generating the seeded coach report, movement metrics, and shot decision timeline."}
+                  {status?.message ?? "Connecting to analysis feed..."}
                 </p>
               </div>
               <button

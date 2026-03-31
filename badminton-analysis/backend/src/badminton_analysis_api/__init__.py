@@ -1,1 +1,0 @@
-"""Badminton analysis backend package."""

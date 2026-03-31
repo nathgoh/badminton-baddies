@@ -74,6 +74,9 @@ class AnalysisStatusResponse(BaseModel):
     message: str
     warnings: list[str]
     error_details: str | None = None
+    pipeline_stage: str | None = None
+    frame_index: int | None = None
+    total_frames: int | None = None
 
 
 class FrameEvent(BaseModel):
@@ -100,6 +103,11 @@ class AnalysisRecord(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     error_details: str | None = None
     progress_step: int = 0
+    progress_percent: int = 0
+    status_message: str | None = None
+    pipeline_stage: str | None = None
+    frame_index: int | None = None
+    total_frames: int | None = None
     source_video_path: str | None = None
     video_duration_seconds: float | None = None
     setup_frame_path: str | None = None

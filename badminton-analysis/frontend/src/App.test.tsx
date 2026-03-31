@@ -4,7 +4,6 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import App from "./App";
 
-
 function queueFetchResponses(
   responses: Array<{
     body: unknown;
@@ -24,6 +23,59 @@ function queueFetchResponses(
 
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
+}
+
+class MockEventSource {
+  static instances: MockEventSource[] = [];
+
+  onmessage: ((event: { data: string }) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  readonly url: string;
+  closed = false;
+  private readonly listeners = new Map<string, Array<(event: Event) => void>>();
+
+  constructor(url: string) {
+    this.url = url;
+    MockEventSource.instances.push(this);
+  }
+
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject) {
+    const callback =
+      typeof listener === "function" ? listener : (event: Event) => listener.handleEvent(event);
+    const current = this.listeners.get(type) ?? [];
+    current.push(callback);
+    this.listeners.set(type, current);
+  }
+
+  close() {
+    this.closed = true;
+  }
+
+  emitMessage(payload: unknown) {
+    this.onmessage?.({ data: JSON.stringify(payload) });
+  }
+
+  emitDone() {
+    for (const listener of this.listeners.get("done") ?? []) {
+      listener(new Event("done"));
+    }
+  }
+
+  emitError() {
+    this.onerror?.(new Event("error"));
+  }
+
+  static latest(): MockEventSource {
+    const instance = MockEventSource.instances.at(-1);
+    if (!instance) {
+      throw new Error("No EventSource instance created.");
+    }
+    return instance;
+  }
+
+  static reset() {
+    MockEventSource.instances = [];
+  }
 }
 
 
@@ -174,6 +226,7 @@ async function flushMicrotasks() {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  MockEventSource.reset();
 });
 
 test("renders the analysis workspace heading", () => {
@@ -216,7 +269,7 @@ test("renders the setup frame and waits for explicit player selection before run
   expect(screen.getByRole("button", { name: /save setup and run/i })).toBeEnabled();
 });
 
-test("polls status, shows warnings, and returns to setup when the analysis fails", async () => {
+test("falls back to polling, shows warnings, and returns to setup when the feed errors", async () => {
   queueFetchResponses([
     {
       status: 201,
@@ -243,7 +296,7 @@ test("polls status, shows warnings, and returns to setup when the analysis fails
       body: {
         analysis_id: "analysis-123",
         stage: "analyzing",
-        message: "Analysis started. Poll status for progress updates.",
+        message: "Analysis started. Connect to the feed for live updates.",
       },
     },
     {
@@ -267,6 +320,7 @@ test("polls status, shows warnings, and returns to setup when the analysis fails
       },
     },
   ]);
+  vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
 
   render(<App />);
 
@@ -286,6 +340,14 @@ test("polls status, shows warnings, and returns to setup when the analysis fails
     await flushMicrotasks();
   });
 
+  const source = MockEventSource.latest();
+  expect(source.url).toBe("/api/analyses/analysis-123/feed");
+
+  await act(async () => {
+    source.emitError();
+    await flushMicrotasks();
+  });
+
   expect(screen.getByText(/62%/i)).toBeInTheDocument();
   expect(screen.getByText(/coach feedback fallback applied/i)).toBeInTheDocument();
 
@@ -298,7 +360,7 @@ test("polls status, shows warnings, and returns to setup when the analysis fails
   expect(screen.getByText(/confirm the tracked player/i)).toBeInTheDocument();
 });
 
-test("renders the expanded coach and analytics report sections from the revised schema", async () => {
+test("streams live frame updates and renders the expanded coach and analytics report sections", async () => {
   queueFetchResponses([
     {
       status: 201,
@@ -325,17 +387,7 @@ test("renders the expanded coach and analytics report sections from the revised 
       body: {
         analysis_id: "analysis-123",
         stage: "analyzing",
-        message: "Analysis started. Poll status for progress updates.",
-      },
-    },
-    {
-      body: {
-        analysis_id: "analysis-123",
-        stage: "analyzing",
-        progress_percent: 62,
-        message: "Tracking the selected player and scoring movement patterns.",
-        warnings: [],
-        error_details: null,
+        message: "Analysis started. Connect to the feed for live updates.",
       },
     },
     {
@@ -350,6 +402,7 @@ test("renders the expanded coach and analytics report sections from the revised 
     },
     { body: completedReport },
   ]);
+  vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
 
   render(<App />);
 
@@ -359,7 +412,6 @@ test("renders the expanded coach and analytics report sections from the revised 
     expect(screen.getByRole("button", { name: /player 1/i })).toBeInTheDocument();
   });
 
-  vi.useFakeTimers();
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /player 1/i }));
     await flushMicrotasks();
@@ -369,10 +421,33 @@ test("renders the expanded coach and analytics report sections from the revised 
     await flushMicrotasks();
   });
 
-  expect(screen.getByText(/62%/i)).toBeInTheDocument();
+  await waitFor(() => {
+    expect(MockEventSource.instances).toHaveLength(1);
+  });
 
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(2000);
+    MockEventSource.latest().emitMessage({
+      analysis_id: "analysis-123",
+      pipeline_stage: "tracking",
+      frame_index: 1,
+      total_frames: 12,
+      progress_percent: 62,
+      message: "Tracking: frame 1/12",
+      frame_jpeg_base64: "ZmFrZS1qcGVn",
+    });
+    await flushMicrotasks();
+  });
+
+  expect(screen.getByText(/62%/i)).toBeInTheDocument();
+  expect(screen.getByText(/player tracking/i)).toBeInTheDocument();
+  expect(screen.getByText("1/12")).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: /analysis frame/i })).toHaveAttribute(
+    "src",
+    expect.stringContaining("data:image/jpeg;base64,ZmFrZS1qcGVn"),
+  );
+
+  await act(async () => {
+    MockEventSource.latest().emitDone();
     await flushMicrotasks();
   });
 
@@ -426,7 +501,7 @@ test("analyze another video button resets to the analyze screen", async () => {
       body: {
         analysis_id: "analysis-123",
         stage: "analyzing",
-        message: "Analysis started.",
+        message: "Analysis started. Connect to the feed for live updates.",
       },
     },
     {
@@ -441,6 +516,7 @@ test("analyze another video button resets to the analyze screen", async () => {
     },
     { body: completedReport },
   ]);
+  vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
 
   render(<App />);
 
@@ -450,7 +526,6 @@ test("analyze another video button resets to the analyze screen", async () => {
     expect(screen.getByRole("button", { name: /player 1/i })).toBeInTheDocument();
   });
 
-  vi.useFakeTimers();
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /player 1/i }));
     await flushMicrotasks();
@@ -459,8 +534,9 @@ test("analyze another video button resets to the analyze screen", async () => {
     fireEvent.click(screen.getByRole("button", { name: /save setup and run/i }));
     await flushMicrotasks();
   });
+
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(2000);
+    MockEventSource.latest().emitDone();
     await flushMicrotasks();
   });
 

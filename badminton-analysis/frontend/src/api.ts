@@ -6,6 +6,7 @@ import type {
   AnalysisSelectionInput,
   AnalysisSetupResponse,
   AnalysisStatusResponse,
+  FrameEvent,
 } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -69,4 +70,29 @@ export function fetchStatus(analysisId: string): Promise<AnalysisStatusResponse>
 
 export function fetchReport(analysisId: string): Promise<AnalysisReport> {
   return request(`/api/analyses/${analysisId}/report`);
+}
+
+export function subscribeToFeed(
+  analysisId: string,
+  onFrame: (event: FrameEvent) => void,
+  onDone: () => void,
+  onError: (error: Event) => void,
+): () => void {
+  const source = new EventSource(`/api/analyses/${analysisId}/feed`);
+
+  source.onmessage = (message) => {
+    onFrame(JSON.parse(message.data) as FrameEvent);
+  };
+
+  source.addEventListener("done", () => {
+    source.close();
+    onDone();
+  });
+
+  source.onerror = (error) => {
+    source.close();
+    onError(error);
+  };
+
+  return () => source.close();
 }

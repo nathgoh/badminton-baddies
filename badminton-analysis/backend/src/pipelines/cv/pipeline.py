@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from importlib import import_module
 from math import hypot
 from pathlib import Path
 from typing import Any, Protocol
 from urllib.request import urlretrieve
 
-from ...schemas import (
+from schemas import (
     CourtModel,
     CourtPoint,
     DetectionBox,
@@ -20,6 +21,9 @@ from ...schemas import (
     TrackSample,
 )
 
+# Callback receives: (frame_index, total_frames, jpeg_bytes | None)
+FrameCallback = Callable[[int, int, bytes | None], None]
+
 
 class CVPipeline(Protocol):
     def detect_setup(self, frame_path: str, match_type: MatchType) -> SetupDetectionResult: ...
@@ -29,9 +33,17 @@ class CVPipeline(Protocol):
         video_path: str,
         court: CourtModel,
         match_type: MatchType,
+        *,
+        on_frame: FrameCallback | None = None,
     ) -> TrackingResult: ...
 
-    def extract_pose(self, video_path: str, selected_track: PlayerTrackSummary) -> PoseSummary: ...
+    def extract_pose(
+        self,
+        video_path: str,
+        selected_track: PlayerTrackSummary,
+        *,
+        on_frame: FrameCallback | None = None,
+    ) -> PoseSummary: ...
 
 
 def _player_count(match_type: MatchType) -> int:
@@ -86,6 +98,8 @@ class MockCVPipeline:
         video_path: str,
         court: CourtModel,
         match_type: MatchType,
+        *,
+        on_frame: FrameCallback | None = None,
     ) -> TrackingResult:
         singles = match_type in {MatchType.MENS_SINGLES, MatchType.WOMENS_SINGLES}
         summary = PlayerTrackSummary(
@@ -114,7 +128,13 @@ class MockCVPipeline:
         )
         return TrackingResult(tracks=[summary], warnings=[])
 
-    def extract_pose(self, video_path: str, selected_track: PlayerTrackSummary) -> PoseSummary:
+    def extract_pose(
+        self,
+        video_path: str,
+        selected_track: PlayerTrackSummary,
+        *,
+        on_frame: FrameCallback | None = None,
+    ) -> PoseSummary:
         return PoseSummary(
             sample_count=12,
             warnings=[],
@@ -165,6 +185,8 @@ class HybridCVPipeline:
         video_path: str,
         court: CourtModel,
         match_type: MatchType,
+        *,
+        on_frame: FrameCallback | None = None,
     ) -> TrackingResult:
         cv2: Any = import_module("cv2")
         capture = cv2.VideoCapture(video_path)
@@ -172,6 +194,7 @@ class HybridCVPipeline:
             raise RuntimeError(f"Unable to open video at {video_path}")
 
         fps = capture.get(cv2.CAP_PROP_FPS) or 30.0
+        total_frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         sample_every = max(1, int(round(fps / self._tracking_sample_fps)))
         frame_index = 0
         raw_tracks: dict[str, list[TrackSample]] = {}
@@ -185,9 +208,14 @@ class HybridCVPipeline:
                 frame_index += 1
                 continue
 
-            for track_id, box in self._track_people(frame):
+            detections = self._track_people(frame)
+            for track_id, box in detections:
                 sample = self._sample_from_box(frame_index, fps, box)
                 raw_tracks.setdefault(track_id, []).append(sample)
+
+            if on_frame is not None:
+                jpeg_bytes = self._annotate_frame(cv2, frame, detections)
+                on_frame(frame_index, total_frame_count, jpeg_bytes)
 
             frame_index += 1
 
@@ -206,7 +234,13 @@ class HybridCVPipeline:
             warnings=[],
         )
 
-    def extract_pose(self, video_path: str, selected_track: PlayerTrackSummary) -> PoseSummary:
+    def extract_pose(
+        self,
+        video_path: str,
+        selected_track: PlayerTrackSummary,
+        *,
+        on_frame: FrameCallback | None = None,
+    ) -> PoseSummary:
         if not selected_track.samples:
             return PoseSummary(
                 sample_count=0,
@@ -233,8 +267,9 @@ class HybridCVPipeline:
         )
         landmarker = mp.tasks.vision.PoseLandmarker.create_from_options(options)
 
+        total_samples = len(selected_track.samples)
         recovered_samples = 0
-        for sample in selected_track.samples:
+        for sample_index, sample in enumerate(selected_track.samples):
             capture.set(cv2.CAP_PROP_POS_FRAMES, sample.frame_index)
             ok, frame = capture.read()
             if not ok:
@@ -247,6 +282,12 @@ class HybridCVPipeline:
             result = landmarker.detect(mp_image)
             if result.pose_landmarks:
                 recovered_samples += 1
+
+            if on_frame is not None:
+                jpeg_bytes = self._annotate_pose(
+                    cv2, frame, result.pose_landmarks, sample.bounding_box
+                )
+                on_frame(sample_index, total_samples, jpeg_bytes)
 
         capture.release()
         landmarker.close()
@@ -409,6 +450,49 @@ class HybridCVPipeline:
             )
 
         return players, []
+
+    def _annotate_frame(
+        self, cv2: Any, frame: Any, detections: list[tuple[str, DetectionBox]]
+    ) -> bytes:
+        """Draw bounding boxes on frame and return JPEG bytes."""
+        annotated = frame.copy()
+        height, width = annotated.shape[:2]
+        for track_id, box in detections:
+            x1 = int(box.x * width)
+            y1 = int(box.y * height)
+            x2 = int((box.x + box.width) * width)
+            y2 = int((box.y + box.height) * height)
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(
+                annotated, track_id, (x1, y1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2
+            )
+        _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 60])
+        return jpeg.tobytes()
+
+    def _annotate_pose(
+        self, cv2: Any, frame: Any, landmarks: Any, box: DetectionBox | None
+    ) -> bytes:
+        """Draw pose landmarks on frame and return JPEG bytes."""
+        annotated = frame.copy()
+        height, width = annotated.shape[:2]
+        if box is not None:
+            x1 = int(box.x * width)
+            y1 = int(box.y * height)
+            x2 = int((box.x + box.width) * width)
+            y2 = int((box.y + box.height) * height)
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), (255, 165, 0), 2)
+        if landmarks and box is not None:
+            crop_x1 = int(box.x * width)
+            crop_y1 = int(box.y * height)
+            crop_w = int(box.width * width)
+            crop_h = int(box.height * height)
+            for pose in landmarks:
+                for lm in pose:
+                    px = crop_x1 + int(lm.x * crop_w)
+                    py = crop_y1 + int(lm.y * crop_h)
+                    cv2.circle(annotated, (px, py), 3, (0, 0, 255), -1)
+        _, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 60])
+        return jpeg.tobytes()
 
     def _track_people(self, frame: Any) -> list[tuple[str, DetectionBox]]:
         model = self._get_yolo_model()

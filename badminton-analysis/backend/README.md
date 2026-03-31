@@ -6,7 +6,7 @@ FastAPI service for the badminton analysis MVP.
 
 ```bash
 uv sync --group dev
-uv run uvicorn badminton_analysis_api.api.app:app --reload --port 8000
+uv run uvicorn api.app:app --reload --port 8000
 uv run pytest
 uv run ruff check .
 uv run ty check src

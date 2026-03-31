@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..schemas import AnalysisRecord
+from schemas import AnalysisRecord
 
 
 class AnalysisStore:

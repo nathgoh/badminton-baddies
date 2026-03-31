@@ -1,3 +1,6 @@
+import json
+import os
+import time
 from base64 import b64decode
 from collections.abc import Generator
 from pathlib import Path
@@ -6,14 +9,14 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-import badminton_analysis_api.api.app as main_module
-from badminton_analysis_api.analyses.service import AnalysisService
-from badminton_analysis_api.analyses.store import AnalysisStore
-from badminton_analysis_api.coaching.engine import (
+import api.app as main_module
+from analyses.service import AnalysisService
+from analyses.store import AnalysisStore
+from coaching.engine import (
     LLMCoachFeedbackEngine,
     build_coach_feedback_engine_from_env,
 )
-from badminton_analysis_api.schemas import (
+from schemas import (
     CoachView,
     CourtModel,
     CourtPoint,
@@ -23,7 +26,7 @@ from badminton_analysis_api.schemas import (
 
 
 def test_schema_package_exports_analysis_and_report_types() -> None:
-    from badminton_analysis_api.schemas import AnalysisReport, AnalysisStage, MatchType
+    from schemas import AnalysisReport, AnalysisStage, MatchType
 
     assert AnalysisReport.__name__ == "AnalysisReport"
     assert AnalysisStage.COMPLETED == "completed"
@@ -31,9 +34,9 @@ def test_schema_package_exports_analysis_and_report_types() -> None:
 
 
 def test_new_package_paths_expose_engines_and_pipelines() -> None:
-    from badminton_analysis_api.coaching.engine import LLMCoachFeedbackEngine
-    from badminton_analysis_api.pipelines.cv.pipeline import CVPipeline
-    from badminton_analysis_api.pipelines.media.pipeline import MediaArtifactPipeline
+    from coaching.engine import LLMCoachFeedbackEngine
+    from pipelines.cv.pipeline import CVPipeline
+    from pipelines.media.pipeline import MediaArtifactPipeline
 
     assert LLMCoachFeedbackEngine.__name__ == "LLMCoachFeedbackEngine"
     assert CVPipeline.__name__ == "CVPipeline"
@@ -41,9 +44,9 @@ def test_new_package_paths_expose_engines_and_pipelines() -> None:
 
 
 def test_analysis_package_exports_service_and_store() -> None:
-    from badminton_analysis_api.analyses.progress import ANALYZING_PROGRESS_STEPS
-    from badminton_analysis_api.analyses.service import AnalysisService
-    from badminton_analysis_api.analyses.store import AnalysisStore
+    from analyses.progress import ANALYZING_PROGRESS_STEPS
+    from analyses.service import AnalysisService
+    from analyses.store import AnalysisStore
 
     assert AnalysisService.__name__ == "AnalysisService"
     assert AnalysisStore.__name__ == "AnalysisStore"
@@ -51,9 +54,27 @@ def test_analysis_package_exports_service_and_store() -> None:
 
 
 def test_api_app_module_exposes_fastapi_app() -> None:
-    import badminton_analysis_api.api.app as app_module
+    import api.app as app_module
 
     assert app_module.app.title == "Badminton Analysis API"
+
+
+def test_api_app_can_load_gemini_key_from_env_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    env_path = tmp_path / ".env"
+    env_path.write_text("GEMINI_API_KEY=test-dotenv-key\n", encoding="utf-8")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    main_module._load_env_file(env_path)
+
+    assert os.getenv("GEMINI_API_KEY") == "test-dotenv-key"
+
+
+def test_legacy_package_path_is_removed() -> None:
+    with pytest.raises(ModuleNotFoundError):
+        __import__("badminton_analysis_api")
 
 
 class FailingCoachFeedbackEngine:
@@ -130,6 +151,8 @@ class FakeCVPipeline:
         video_path: str,
         court: CourtModel,
         match_type: MatchType,
+        *,
+        on_frame=None,
     ) -> SimpleNamespace:
         tracks = {
             "track-1": SimpleNamespace(
@@ -154,7 +177,13 @@ class FakeCVPipeline:
             warnings=[],
         )
 
-    def extract_pose(self, video_path: str, selected_track_id: str) -> SimpleNamespace:
+    def extract_pose(
+        self,
+        video_path: str,
+        selected_track: object,
+        *,
+        on_frame=None,
+    ) -> SimpleNamespace:
         return SimpleNamespace(
             sample_count=14,
             warnings=[],
@@ -163,6 +192,44 @@ class FakeCVPipeline:
             balance_note="Balance drops when the final recovery hop lands too upright.",
             recovery_note="Recovery timing is playable but still late after deeper exits.",
             stroke_execution_note="Stroke execution quality falls off after off-balance contacts.",
+        )
+
+
+class StreamingFakeCVPipeline(FakeCVPipeline):
+    def track_players(
+        self,
+        video_path: str,
+        court: CourtModel,
+        match_type: MatchType,
+        *,
+        on_frame=None,
+    ) -> SimpleNamespace:
+        if on_frame is not None:
+            on_frame(0, 2, b"tracking-frame-0")
+            time.sleep(0.05)
+            on_frame(1, 2, b"tracking-frame-1")
+            time.sleep(0.05)
+        return super().track_players(
+            video_path,
+            court,
+            match_type,
+            on_frame=on_frame,
+        )
+
+    def extract_pose(
+        self,
+        video_path: str,
+        selected_track: object,
+        *,
+        on_frame=None,
+    ) -> SimpleNamespace:
+        if on_frame is not None:
+            on_frame(0, 1, b"pose-frame-0")
+            time.sleep(0.05)
+        return super().extract_pose(
+            video_path,
+            selected_track,
+            on_frame=on_frame,
         )
 
 
@@ -220,13 +287,14 @@ def _ready_analysis(client: TestClient, *, match_type: str = "mixed_doubles") ->
 
 def _poll_until_terminal(client: TestClient, analysis_id: str) -> list[dict]:
     statuses: list[dict] = []
-    for _ in range(12):
+    for _ in range(50):
         response = client.get(f"/api/analyses/{analysis_id}/status")
         assert response.status_code == 200
         payload = response.json()
         statuses.append(payload)
         if payload["stage"] in {"completed", "failed"}:
             break
+        time.sleep(0.05)
     return statuses
 
 
@@ -397,12 +465,13 @@ def test_status_progresses_to_completed_and_report_matches_revised_schema(
 
     statuses = _poll_until_terminal(client, analysis_id)
 
-    assert statuses[0]["stage"] == "analyzing"
+    assert statuses[0]["stage"] in {"analyzing", "completed"}
     assert statuses[-1]["stage"] == "completed"
     assert statuses[-1]["progress_percent"] == 100
     assert statuses[-1]["warnings"] == []
     assert statuses[-1]["error_details"] is None
-    assert statuses[0]["progress_percent"] < statuses[-1]["progress_percent"]
+    if len(statuses) > 1:
+        assert statuses[0]["progress_percent"] < statuses[-1]["progress_percent"]
 
     report_response = client.get(f"/api/analyses/{analysis_id}/report")
 
@@ -423,6 +492,30 @@ def test_status_progresses_to_completed_and_report_matches_revised_schema(
     assert report["coach_view"]["positioning_notes"]
     assert report["coach_view"]["confidence_notes"]
     assert report["confidence_annotations"]
+
+
+def test_run_analysis_completes_in_background_without_status_polling(
+    client: TestClient,
+) -> None:
+    analysis_id, _ = _ready_analysis(client, match_type="mens_singles")
+
+    run_response = client.post(f"/api/analyses/{analysis_id}/run")
+
+    assert run_response.status_code == 202
+    assert (
+        run_response.json()["message"] == "Analysis started. Connect to the feed for live updates."
+    )
+
+    report_response = None
+    for _ in range(50):
+        report_response = client.get(f"/api/analyses/{analysis_id}/report")
+        if report_response.status_code == 200:
+            break
+        time.sleep(0.05)
+
+    assert report_response is not None
+    assert report_response.status_code == 200
+    assert report_response.json()["analysis_id"] == analysis_id
 
 
 def test_run_analysis_uses_cv_tracking_and_pose_signals_in_analytics(client: TestClient) -> None:
@@ -565,7 +658,7 @@ def test_failed_analysis_sets_error_details_and_status_poll_remains_200(
     assert second_failure_status.json()["stage"] == "failed"
 
 
-def test_status_walks_each_mock_pipeline_stage_before_completion(client: TestClient) -> None:
+def test_status_reaches_completion_without_fake_step_walk(client: TestClient) -> None:
     analysis_id, _ = _ready_analysis(client, match_type="mens_singles")
 
     run_response = client.post(f"/api/analyses/{analysis_id}/run")
@@ -574,17 +667,7 @@ def test_status_walks_each_mock_pipeline_stage_before_completion(client: TestCli
 
     statuses = _poll_until_terminal(client, analysis_id)
 
-    assert [status["message"] for status in statuses[:-1]] == [
-        "Ingesting the YouTube match and normalizing the video.",
-        "Extracting the setup frame from the opening rally window.",
-        "Detecting court geometry and applying any saved manual overrides.",
-        "Detecting players and building multi-person tracks.",
-        "Assigning the selected player to the tracked movement sequence.",
-        "Extracting pose landmarks and movement signals.",
-        "Inferring shot events from the tracked rally sequence.",
-        "Scoring tactical shot quality and decision outcomes.",
-        "Assembling the coach report and analytics evidence.",
-    ]
+    assert len(statuses) < 6
     assert statuses[-1]["stage"] == "completed"
     assert statuses[-1]["message"] == "Report generated successfully."
 
@@ -648,29 +731,34 @@ def test_build_coach_feedback_engine_defaults_to_gemini_flash() -> None:
 def test_llm_engine_can_drive_coach_feedback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    class FakeLLMClient:
-        def generate(self, *, provider: str, model: str, prompt: str) -> dict[str, object]:
-            assert provider == "gemini"
-            assert model == "gemini-3-flash-preview"
-            assert "analysis_evidence" in prompt
-            assert "confidence_annotations" in prompt
-            assert "tracked_player" in prompt
-            return {
-                "coach_view": CoachView(
-                    summary="AI summary",
-                    strengths=["AI strength"],
-                    priority_issues=["AI issue"],
-                    shot_selection_notes="AI shot notes",
-                    footwork_notes="AI footwork notes",
-                    positioning_notes="AI positioning notes",
-                    confidence_notes="AI confidence notes",
-                    recommended_drills=["AI drill"],
-                ).model_dump(mode="json"),
-                "ai_rationale": {
-                    "summary": "AI rationale",
-                    "evidence_highlights": ["Birdie pressure repeated through the forecourt."],
-                },
-            }
+    import json
+
+    from pydantic_ai.messages import ModelResponse, TextPart
+    from pydantic_ai.models.function import FunctionModel
+
+    from coaching.engine import LLMCoachOutput
+
+    fake_output = LLMCoachOutput(
+        coach_view=CoachView(
+            summary="AI summary",
+            strengths=["AI strength"],
+            priority_issues=["AI issue"],
+            shot_selection_notes="AI shot notes",
+            footwork_notes="AI footwork notes",
+            positioning_notes="AI positioning notes",
+            confidence_notes="AI confidence notes",
+            recommended_drills=["AI drill"],
+        ),
+        ai_rationale={
+            "summary": "AI rationale",
+            "evidence_highlights": ["Birdie pressure repeated through the forecourt."],
+        },
+    )
+
+    def fake_model_function(messages, info):  # noqa: ANN001, ARG001
+        return ModelResponse(
+            parts=[TextPart(content=json.dumps(fake_output.model_dump(mode="json")))]
+        )
 
     monkeypatch.setattr(
         main_module,
@@ -680,7 +768,7 @@ def test_llm_engine_can_drive_coach_feedback(
             coach_feedback_engine=LLMCoachFeedbackEngine(
                 provider="gemini",
                 model="gemini-3-flash-preview",
-                client_factory=lambda _provider: FakeLLMClient(),
+                model_override=FunctionModel(fake_model_function),
             ),
             cv_pipeline=FakeCVPipeline(),
         ),
@@ -701,6 +789,57 @@ def test_llm_engine_can_drive_coach_feedback(
     assert report_response.json()["llm_provider"] == "gemini"
     assert report_response.json()["llm_model"] == "gemini-3-flash-preview"
     assert report_response.json()["ai_rationale"]["summary"] == "AI rationale"
+
+
+def test_sse_feed_streams_events_and_done_sentinel(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        main_module,
+        "service",
+        AnalysisService(
+            store=AnalysisStore(),
+            media_artifact_pipeline=FakeMediaArtifactPipeline(tmp_path),
+            cv_pipeline=StreamingFakeCVPipeline(),
+        ),
+    )
+
+    with TestClient(main_module.app) as client:
+        analysis_id, _ = _ready_analysis(client)
+
+        run_response = client.post(f"/api/analyses/{analysis_id}/run")
+
+        assert run_response.status_code == 202
+
+        with client.stream("GET", f"/api/analyses/{analysis_id}/feed") as response:
+            assert response.status_code == 200
+            body = "".join(response.iter_text())
+
+        blocks = [block for block in body.split("\n\n") if block.strip()]
+        payloads = []
+        done_seen = False
+
+        for block in blocks:
+            lines = block.splitlines()
+            if "event: done" in lines:
+                done_seen = True
+                continue
+
+            data_line = next((line for line in lines if line.startswith("data: ")), None)
+            assert data_line is not None
+            payloads.append(json.loads(data_line.removeprefix("data: ")))
+
+        assert payloads
+        assert any(
+            payload["pipeline_stage"] == "tracking" and payload["frame_jpeg_base64"]
+            for payload in payloads
+        )
+        assert done_seen is True
+
+        status_response = client.get(f"/api/analyses/{analysis_id}/status")
+        assert status_response.status_code == 200
+        assert status_response.json()["stage"] == "completed"
 
 
 def test_pagination_clamps_invalid_page_values(client: TestClient) -> None:
