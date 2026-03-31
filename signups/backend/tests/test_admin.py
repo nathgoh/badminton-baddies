@@ -187,6 +187,23 @@ def test_waitlist_signup_does_not_recalculate_costs(client):
     _signup(client, token, "c@t.com", "Carol")
     _signup(client, token, "d@t.com", "Dan")
 
+    response = client.post(f"/api/admin/sessions/{session['id']}/calculate-costs")
+    assert response.status_code == 200
+    assert response.json()["base_amount"] == 7.5
+
+    before_waitlist = client.get(f"/api/admin/sessions/{session['id']}")
+    expected_amounts = {
+        signup["email"]: signup["amount_owed"]
+        for signup in before_waitlist.json()["signups"]
+        if signup["status"] == "confirmed"
+    }
+    assert expected_amounts == {
+        "a@t.com": 7.5,
+        "b@t.com": 7.5,
+        "c@t.com": 7.5,
+        "d@t.com": 7.5,
+    }
+
     response = _signup(client, token, "e@t.com", "Eve")
 
     assert response.status_code == 201
@@ -196,10 +213,7 @@ def test_waitlist_signup_does_not_recalculate_costs(client):
     signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
 
     assert signups["e@t.com"]["amount_owed"] is None
-    assert signups["a@t.com"]["amount_owed"] is None
-    assert signups["b@t.com"]["amount_owed"] is None
-    assert signups["c@t.com"]["amount_owed"] is None
-    assert signups["d@t.com"]["amount_owed"] is None
+    assert {email: signups[email]["amount_owed"] for email in expected_amounts} == expected_amounts
 
 
 def test_manual_amount_edit_recalculates_remaining_confirmed_players(client):
@@ -232,6 +246,24 @@ def test_waitlist_cancel_does_not_recalculate_costs(client):
     _signup(client, token, "b@t.com", "Bob")
     _signup(client, token, "c@t.com", "Carol")
     _signup(client, token, "d@t.com", "Dan")
+
+    response = client.post(f"/api/admin/sessions/{session['id']}/calculate-costs")
+    assert response.status_code == 200
+    assert response.json()["base_amount"] == 7.5
+
+    before_waitlist = client.get(f"/api/admin/sessions/{session['id']}")
+    expected_amounts = {
+        signup["email"]: signup["amount_owed"]
+        for signup in before_waitlist.json()["signups"]
+        if signup["status"] == "confirmed"
+    }
+    assert expected_amounts == {
+        "a@t.com": 7.5,
+        "b@t.com": 7.5,
+        "c@t.com": 7.5,
+        "d@t.com": 7.5,
+    }
+
     eve = _signup(client, token, "e@t.com", "Eve").json()
 
     response = client.delete(f"/api/admin/signups/{eve['id']}")
@@ -243,13 +275,12 @@ def test_waitlist_cancel_does_not_recalculate_costs(client):
     signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
 
     assert "e@t.com" not in signups
-    assert signups["a@t.com"]["amount_owed"] is None
-    assert signups["b@t.com"]["amount_owed"] is None
-    assert signups["c@t.com"]["amount_owed"] is None
-    assert signups["d@t.com"]["amount_owed"] is None
+    assert {email: signups[email]["amount_owed"] for email in expected_amounts} == expected_amounts
 
 
-def test_admin_cancel_with_waitlist_promotion_recalculates_once_for_final_roster(client):
+def test_admin_cancel_with_waitlist_promotion_recalculates_once_for_final_roster(client, monkeypatch):
+    from ..routers import admin as admin_router
+
     session = _setup(client)
     token = session["access_token"]
     _signup(client, token, "a@t.com", "Alice")
@@ -258,9 +289,24 @@ def test_admin_cancel_with_waitlist_promotion_recalculates_once_for_final_roster
     _signup(client, token, "d@t.com", "Dan")
     _signup(client, token, "e@t.com", "Eve")
 
+    baseline = client.post(f"/api/admin/sessions/{session['id']}/calculate-costs")
+    assert baseline.status_code == 200
+    assert baseline.json()["base_amount"] == 7.5
+
+    call_count = 0
+    original_calculate_costs = admin_router.calculate_costs
+
+    def counting_calculate_costs(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return original_calculate_costs(*args, **kwargs)
+
+    monkeypatch.setattr(admin_router, "calculate_costs", counting_calculate_costs)
+
     response = client.delete(f"/api/admin/signups/{bob['id']}")
 
     assert response.status_code == 200
+    assert call_count == 1
 
     session_response = client.get(f"/api/admin/sessions/{session['id']}")
     signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
