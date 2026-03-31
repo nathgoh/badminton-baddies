@@ -166,11 +166,9 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                           role="button"
                           tabIndex={0}
                           className={`cursor-pointer rounded-full px-5 py-2.5 text-base font-semibold transition hover:opacity-80 ${
-                            signup.amount_adjusted
-                              ? 'bg-amber-100 text-amber-800'
-                              : isPaid
+                            isPaid
                               ? 'bg-emerald-200 text-emerald-900'
-                              : 'bg-emerald-100 text-emerald-800'
+                              : 'bg-slate-100 text-slate-700'
                           }`}
                           onClick={(e) => { e.stopPropagation(); startEditingAmount(signup) }}
                           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); startEditingAmount(signup) } }}
