@@ -74,17 +74,13 @@ function App() {
     async function pollStatus() {
       try {
         const nextStatus = await fetchStatus(stableAnalysisId);
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         startTransition(() => setStatus(nextStatus));
 
         if (nextStatus.stage === "completed") {
           const nextReport = await fetchReport(stableAnalysisId);
-          if (cancelled) {
-            return;
-          }
+          if (cancelled) return;
 
           startTransition(() => {
             setReport(nextReport);
@@ -105,9 +101,7 @@ function App() {
           void pollStatus();
         }, 2000);
       } catch (pollError) {
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         startTransition(() => {
           setError(
@@ -129,6 +123,20 @@ function App() {
       }
     };
   }, [analysis, screen]);
+
+  function resetToAnalyze() {
+    startTransition(() => {
+      setScreen("analyze");
+      setAnalysis(null);
+      setSetup(null);
+      setCourtPoints([]);
+      setSelectedPlayer(null);
+      setStatus(null);
+      setReport(null);
+      setError(null);
+      setReportTab("coach");
+    });
+  }
 
   async function handleCreateAnalysis(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -164,9 +172,7 @@ function App() {
   }
 
   async function handleRunAnalysis() {
-    if (!analysis || !setup || !selectedPlayer) {
-      return;
-    }
+    if (!analysis || !setup || !selectedPlayer) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -205,9 +211,7 @@ function App() {
 
   function updateCourtPoint(index: number, clientX: number, clientY: number) {
     const bounds = frameRef.current?.getBoundingClientRect();
-    if (!bounds || bounds.width === 0 || bounds.height === 0) {
-      return;
-    }
+    if (!bounds || bounds.width === 0 || bounds.height === 0) return;
 
     const nextPoint = {
       x: clamp((clientX - bounds.left) / bounds.width),
@@ -228,10 +232,7 @@ function App() {
   }
 
   function handleFramePointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (draggingCorner === null) {
-      return;
-    }
-
+    if (draggingCorner === null) return;
     updateCourtPoint(draggingCorner, event.clientX, event.clientY);
   }
 
@@ -239,70 +240,103 @@ function App() {
     setDraggingCorner(null);
   }
 
-  return (
-    <div className="app-shell">
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
+  const stageLabels: Screen[] = ["analyze", "setup", "processing", "report"];
+  const stageDisplay: Record<Screen, string> = {
+    analyze: "Analyze",
+    setup: "Setup",
+    processing: "Run",
+    report: "Report",
+  };
 
-      <header className="hero">
-        <p className="eyebrow">Badminton video intelligence</p>
-        <h1>Badminton Analysis</h1>
-        <p className="hero-copy">
-          Coach-first review for YouTube match footage with player selection, tactical shot
-          grading, and report-ready movement insight.
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+      <header className="max-w-4xl mx-auto px-6 pt-10 pb-6">
+        <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+          Badminton video intelligence
+        </p>
+        <h1 className="mt-2 text-4xl sm:text-5xl font-bold tracking-tight text-slate-900">
+          Badminton Analysis
+        </h1>
+        <p className="mt-3 text-base text-slate-500 max-w-2xl leading-relaxed">
+          Coach-first review for YouTube match footage with player selection, tactical shot grading,
+          and report-ready movement insight.
         </p>
       </header>
 
-      <main className="workspace">
-        <section className="stage-card">
-          <div className="stage-header">
+      <main className="max-w-5xl mx-auto px-6 pb-16 grid gap-6 lg:grid-cols-[1fr_260px] lg:items-start">
+        <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          {/* Stage header */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
             <div>
-              <p className="label">Workflow</p>
-              <h2>
+              <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                Workflow
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-800">
                 {screen === "analyze" && "Start an analysis"}
                 {screen === "setup" && "Confirm the tracked player"}
                 {screen === "processing" && "Building the report"}
                 {screen === "report" && "Review the report"}
               </h2>
             </div>
-            <ol className="stage-rail" aria-label="Analysis stages">
-              <li data-active={screen === "analyze"}>Analyze</li>
-              <li data-active={screen === "setup"}>Setup</li>
-              <li data-active={screen === "processing"}>Run</li>
-              <li data-active={screen === "report"}>Report</li>
+            <ol
+              className="grid grid-cols-4 gap-2 list-none m-0 p-0"
+              aria-label="Analysis stages"
+            >
+              {stageLabels.map((stage) => (
+                <li
+                  key={stage}
+                  className={`px-3 py-2 rounded-full text-center text-sm border ${
+                    screen === stage
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-slate-50 text-slate-400 border-slate-200"
+                  }`}
+                >
+                  {stageDisplay[stage]}
+                </li>
+              ))}
             </ol>
           </div>
 
-          {error ? <div className="notice error">{error}</div> : null}
+          {/* Error notice */}
+          {error ? (
+            <div className="mb-4 p-4 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>
+          ) : null}
 
+          {/* Warnings */}
           {status?.warnings.length ? (
-            <div className="stack warning-stack">
+            <div className="grid gap-2 mb-4">
               {status.warnings.map((warning) => (
-                <div className="notice warning" key={warning}>
+                <div
+                  className="p-3 rounded-xl bg-amber-50 text-amber-700 text-sm"
+                  key={warning}
+                >
                   {warning}
                 </div>
               ))}
             </div>
           ) : null}
 
+          {/* Analyze screen */}
           {screen === "analyze" ? (
-            <form className="stack" onSubmit={handleCreateAnalysis}>
-              <label className="field">
-                <span>YouTube link</span>
+            <form className="grid gap-5" onSubmit={handleCreateAnalysis}>
+              <label className="grid gap-2">
+                <span className="text-sm font-medium text-slate-700">YouTube link</span>
                 <input
                   required
                   type="url"
                   value={youtubeUrl}
                   onChange={(event) => setYoutubeUrl(event.target.value)}
                   placeholder="https://www.youtube.com/watch?v=..."
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </label>
 
-              <label className="field">
-                <span>Match type</span>
+              <label className="grid gap-2">
+                <span className="text-sm font-medium text-slate-700">Match type</span>
                 <select
                   value={matchType}
                   onChange={(event) => setMatchType(event.target.value as MatchType)}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   {matchTypes.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -312,28 +346,41 @@ function App() {
                 </select>
               </label>
 
-              <div className="support-grid">
-                <article className="support-card">
-                  <p className="label">Coach tab priority</p>
-                  <p>Summary, strengths, issues, drills, and shot-choice notes lead the experience.</p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <article className="p-4 border border-slate-200 rounded-xl bg-slate-50">
+                  <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                    Coach tab priority
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Summary, strengths, issues, drills, and shot-choice notes lead the experience.
+                  </p>
                 </article>
-                <article className="support-card">
-                  <p className="label">Analytics tab support</p>
-                  <p>Movement, positioning, and shot events remain available as clip-backed evidence.</p>
+                <article className="p-4 border border-slate-200 rounded-xl bg-slate-50">
+                  <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                    Analytics tab support
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Movement, positioning, and shot events remain available as clip-backed evidence.
+                  </p>
                 </article>
               </div>
 
-              <button className="primary-button" disabled={isSubmitting} type="submit">
+              <button
+                className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-wait"
+                disabled={isSubmitting}
+                type="submit"
+              >
                 {isSubmitting ? "Preparing setup..." : "Create analysis"}
               </button>
             </form>
           ) : null}
 
+          {/* Setup screen */}
           {screen === "setup" && setup ? (
-            <div className="stack">
-              <div className="setup-preview">
+            <div className="grid gap-5">
+              <div className="grid lg:grid-cols-[1.25fr_0.75fr] gap-4">
                 <div
-                  className="frame"
+                  className="relative min-h-[250px] rounded-2xl border border-slate-200 overflow-hidden bg-slate-100"
                   onPointerCancel={stopDragging}
                   onPointerLeave={stopDragging}
                   onPointerMove={handleFramePointerMove}
@@ -342,14 +389,14 @@ function App() {
                 >
                   <img
                     alt="Setup frame"
-                    className="setup-image"
+                    className="block w-full h-full min-h-[250px] object-cover"
                     src={setup.setup_frame_url}
                   />
-                  <div className="court-overlay">
+                  <div className="absolute inset-0">
                     {courtPoints.map((point, index) => (
                       <button
                         aria-label={`Court corner ${index + 1}`}
-                        className="court-handle"
+                        className="absolute w-6 h-6 -ml-3 -mt-3 border-2 border-white rounded-full bg-blue-500 shadow-lg hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                         key={`${point.x}-${point.y}-${index}`}
                         onPointerDown={handleCourtCornerPointerDown(index)}
                         style={
@@ -364,122 +411,204 @@ function App() {
                   </div>
                 </div>
 
-                <div className="support-card">
-                  <p className="label">Court setup</p>
-                  <p>{setup.court.adjustment_hint}</p>
-                  <p className="metric">
+                <div className="p-4 border border-slate-200 rounded-xl bg-slate-50">
+                  <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                    Court setup
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600">{setup.court.adjustment_hint}</p>
+                  <p className="mt-2 text-sm font-medium text-slate-800">
                     Detection confidence: {Math.round(setup.court.confidence * 100)}%
                   </p>
-                  <p className="muted">Drag any court corner to correct the detected geometry.</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Drag any court corner to correct the detected geometry.
+                  </p>
                 </div>
               </div>
 
-              <div className="player-grid">
+              <div className="grid sm:grid-cols-2 gap-3">
                 {setup.players.map((player) => (
                   <button
                     key={player.player_id}
-                    className="player-card"
-                    data-selected={selectedPlayer?.player_id === player.player_id}
+                    className={`text-left p-4 border rounded-xl grid gap-2 transition-colors ${
+                      selectedPlayer?.player_id === player.player_id
+                        ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500"
+                        : "border-slate-200 bg-white hover:bg-slate-50"
+                    }`}
                     onClick={() => setSelectedPlayer(player)}
                     type="button"
                   >
-                    <span className="label">{player.side} side</span>
-                    <strong>{player.label}</strong>
-                    <span>{player.focus_hint}</span>
+                    <span className="text-xs font-semibold tracking-widest uppercase text-slate-400">
+                      {player.side} side
+                    </span>
+                    <strong className="text-sm text-slate-800">{player.label}</strong>
+                    <span className="text-xs text-slate-500">{player.focus_hint}</span>
                   </button>
                 ))}
               </div>
 
-              <button
-                className="primary-button"
-                disabled={isSubmitting || !selectedPlayer}
-                onClick={handleRunAnalysis}
-                type="button"
-              >
-                {isSubmitting ? "Running analysis..." : "Save setup and run"}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  className="py-3 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-colors"
+                  onClick={resetToAnalyze}
+                  type="button"
+                >
+                  Back
+                </button>
+                <button
+                  className="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-wait"
+                  disabled={isSubmitting || !selectedPlayer}
+                  onClick={handleRunAnalysis}
+                  type="button"
+                >
+                  {isSubmitting ? "Running analysis..." : "Save setup and run"}
+                </button>
+              </div>
             </div>
           ) : null}
 
+          {/* Processing screen */}
           {screen === "processing" ? (
-            <div className="stack">
-              <div className="progress-bar" aria-hidden="true">
-                <span style={{ width: `${status?.progress_percent ?? 0}%` }} />
+            <div className="grid gap-5">
+              <div
+                className="w-full h-4 rounded-full bg-slate-100 overflow-hidden"
+                aria-hidden="true"
+              >
+                <span
+                  className="block h-full rounded-full bg-blue-500 transition-all duration-500"
+                  style={{ width: `${status?.progress_percent ?? 0}%` }}
+                />
               </div>
-              <div className="progress-meta">
-                <strong>{status?.progress_percent ?? 0}%</strong>
-                <p className="processing-copy">
+              <div className="grid gap-2">
+                <strong className="text-lg text-slate-800">
+                  {status?.progress_percent ?? 0}%
+                </strong>
+                <p className="text-sm text-slate-500">
                   {status?.message ??
                     "Generating the seeded coach report, movement metrics, and shot decision timeline."}
                 </p>
               </div>
+              <button
+                className="justify-self-start py-2 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-colors"
+                onClick={() => setScreen("setup")}
+                type="button"
+              >
+                Back to setup
+              </button>
             </div>
           ) : null}
 
+          {/* Report screen */}
           {screen === "report" && report ? (
-            <div className="stack">
-              <div className="tab-bar" role="tablist" aria-label="Report tabs">
+            <div className="grid gap-5">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div
+                  className="inline-grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-100"
+                  role="tablist"
+                  aria-label="Report tabs"
+                >
+                  <button
+                    aria-selected={reportTab === "coach"}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      reportTab === "coach"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                    onClick={() => setReportTab("coach")}
+                    role="tab"
+                    type="button"
+                  >
+                    Coach View
+                  </button>
+                  <button
+                    aria-selected={reportTab === "analytics"}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      reportTab === "analytics"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                    onClick={() => setReportTab("analytics")}
+                    role="tab"
+                    type="button"
+                  >
+                    Analytics View
+                  </button>
+                </div>
                 <button
-                  aria-selected={reportTab === "coach"}
-                  className="tab"
-                  onClick={() => setReportTab("coach")}
-                  role="tab"
+                  className="py-2 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
+                  onClick={resetToAnalyze}
                   type="button"
                 >
-                  Coach View
-                </button>
-                <button
-                  aria-selected={reportTab === "analytics"}
-                  className="tab"
-                  onClick={() => setReportTab("analytics")}
-                  role="tab"
-                  type="button"
-                >
-                  Analytics View
+                  Analyze another video
                 </button>
               </div>
 
               {reportTab === "coach" ? (
-                <div className="report-grid">
-                  <article className="report-card feature-card">
-                    <p className="label">Summary</p>
-                    <p>{report.coach_view.summary}</p>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <article className="sm:col-span-2 p-5 border border-blue-100 rounded-xl bg-blue-50">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Summary
+                    </p>
+                    <p className="mt-2 text-sm text-slate-700 leading-relaxed">
+                      {report.coach_view.summary}
+                    </p>
                   </article>
-                  <article className="report-card">
-                    <p className="label">Strengths</p>
-                    <ul>
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Strengths
+                    </p>
+                    <ul className="mt-2 pl-4 text-sm text-slate-600 list-disc space-y-1">
                       {report.coach_view.strengths.map((item) => (
                         <li key={item}>{item}</li>
                       ))}
                     </ul>
                   </article>
-                  <article className="report-card">
-                    <p className="label">Priority issues</p>
-                    <ul>
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Priority issues
+                    </p>
+                    <ul className="mt-2 pl-4 text-sm text-slate-600 list-disc space-y-1">
                       {report.coach_view.priority_issues.map((item) => (
                         <li key={item}>{item}</li>
                       ))}
                     </ul>
                   </article>
-                  <article className="report-card">
-                    <p className="label">Shot-selection notes</p>
-                    <p>{report.coach_view.shot_selection_notes}</p>
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Shot-selection notes
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {report.coach_view.shot_selection_notes}
+                    </p>
                   </article>
-                  <article className="report-card">
-                    <p className="label">Footwork notes</p>
-                    <p>{report.coach_view.footwork_notes}</p>
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Footwork notes
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {report.coach_view.footwork_notes}
+                    </p>
                   </article>
-                  <article className="report-card">
-                    <p className="label">Positioning notes</p>
-                    <p>{report.coach_view.positioning_notes}</p>
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Positioning notes
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {report.coach_view.positioning_notes}
+                    </p>
                   </article>
-                  <article className="report-card">
-                    <p className="label">Confidence notes</p>
-                    <p>{report.coach_view.confidence_notes}</p>
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Confidence notes
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {report.coach_view.confidence_notes}
+                    </p>
                   </article>
-                  <article className="report-card">
-                    <p className="label">Recommended drills</p>
-                    <ul>
+                  <article className="sm:col-span-2 p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Recommended drills
+                    </p>
+                    <ul className="mt-2 pl-4 text-sm text-slate-600 list-disc space-y-1">
                       {report.coach_view.recommended_drills.map((item) => (
                         <li key={item}>{item}</li>
                       ))}
@@ -489,10 +618,12 @@ function App() {
               ) : null}
 
               {reportTab === "analytics" ? (
-                <div className="report-grid">
-                  <article className="report-card">
-                    <p className="label">Mechanics</p>
-                    <ul>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Mechanics
+                    </p>
+                    <ul className="mt-2 text-sm text-slate-600 space-y-2">
                       <li>{report.analytics_view.mechanics.stance_note}</li>
                       <li>{report.analytics_view.mechanics.preparation_note}</li>
                       <li>{report.analytics_view.mechanics.balance_note}</li>
@@ -501,97 +632,150 @@ function App() {
                     </ul>
                   </article>
 
-                  <article className="report-card">
-                    <p className="label">Movement</p>
-                    <div className="metric-grid">
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Movement
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-4">
                       <div>
-                        <strong>{report.analytics_view.movement.total_distance_meters.toFixed(1)}m</strong>
-                        <span>Total distance</span>
-                      </div>
-                      <div>
-                        <strong>{report.analytics_view.movement.recovery_score}</strong>
-                        <span>Recovery score</span>
-                      </div>
-                      <div>
-                        <strong>{report.analytics_view.movement.court_coverage_percent}%</strong>
-                        <span>Court coverage</span>
-                      </div>
-                      <div>
-                        <strong>{report.analytics_view.movement.change_of_direction_count}</strong>
-                        <span>Direction changes</span>
-                      </div>
-                      <div>
-                        <strong>{report.analytics_view.movement.burst_count}</strong>
-                        <span>Burst count</span>
-                      </div>
-                      <div>
-                        <strong>
-                          {Math.round(report.analytics_view.movement.directional_balance.left * 100)} /{" "}
-                          {Math.round(report.analytics_view.movement.directional_balance.right * 100)}
+                        <strong className="text-lg text-slate-800">
+                          {report.analytics_view.movement.total_distance_meters.toFixed(1)}m
                         </strong>
-                        <span>Left / right balance</span>
+                        <span className="block text-xs text-slate-400">Total distance</span>
+                      </div>
+                      <div>
+                        <strong className="text-lg text-slate-800">
+                          {report.analytics_view.movement.recovery_score}
+                        </strong>
+                        <span className="block text-xs text-slate-400">Recovery score</span>
+                      </div>
+                      <div>
+                        <strong className="text-lg text-slate-800">
+                          {report.analytics_view.movement.court_coverage_percent}%
+                        </strong>
+                        <span className="block text-xs text-slate-400">Court coverage</span>
+                      </div>
+                      <div>
+                        <strong className="text-lg text-slate-800">
+                          {report.analytics_view.movement.change_of_direction_count}
+                        </strong>
+                        <span className="block text-xs text-slate-400">Direction changes</span>
+                      </div>
+                      <div>
+                        <strong className="text-lg text-slate-800">
+                          {report.analytics_view.movement.burst_count}
+                        </strong>
+                        <span className="block text-xs text-slate-400">Burst count</span>
+                      </div>
+                      <div>
+                        <strong className="text-lg text-slate-800">
+                          {Math.round(
+                            report.analytics_view.movement.directional_balance.left * 100,
+                          )}{" "}
+                          /{" "}
+                          {Math.round(
+                            report.analytics_view.movement.directional_balance.right * 100,
+                          )}
+                        </strong>
+                        <span className="block text-xs text-slate-400">Left / right balance</span>
                       </div>
                     </div>
                   </article>
 
-                  <article className="report-card">
-                    <p className="label">Positioning</p>
-                    <p>{report.analytics_view.positioning.base_position_note}</p>
-                    <p>{report.analytics_view.positioning.spacing_note}</p>
-                    <div className="zone-grid">
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Positioning
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {report.analytics_view.positioning.base_position_note}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {report.analytics_view.positioning.spacing_note}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 mt-4">
                       {Object.entries(report.analytics_view.positioning.zone_occupancy).map(
                         ([zone, weight]) => (
-                          <div className="zone-pill" key={zone}>
-                            <strong>{weight}%</strong>
-                            <span>{zone}</span>
+                          <div
+                            className="p-3 border border-slate-200 rounded-lg bg-slate-50 text-center"
+                            key={zone}
+                          >
+                            <strong className="text-sm text-slate-800">{weight}%</strong>
+                            <span className="block text-xs text-slate-400">{zone}</span>
                           </div>
                         ),
                       )}
                     </div>
-                    <div className="heatmap-card">
-                      <p className="label">Heatmap</p>
-                      <div className="heatmap-grid">
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                        Heatmap
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 mt-2">
                         {report.analytics_view.positioning.heatmap.map((cell) => (
-                          <article className="heatmap-cell" key={cell.zone}>
-                            <strong>{cell.zone}</strong>
-                            <span>{Math.round(cell.weight * 100)}%</span>
+                          <article
+                            className="p-3 border border-slate-200 rounded-lg bg-blue-50"
+                            key={cell.zone}
+                          >
+                            <strong className="text-xs text-slate-700">{cell.zone}</strong>
+                            <span className="block text-sm text-blue-600 font-semibold">
+                              {Math.round(cell.weight * 100)}%
+                            </span>
                           </article>
                         ))}
                       </div>
                     </div>
                   </article>
 
-                  <article className="report-card">
-                    <p className="label">Shot selection</p>
-                    <p>{report.analytics_view.shot_selection.overview}</p>
-                    <div className="event-stack">
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Shot selection
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {report.analytics_view.shot_selection.overview}
+                    </p>
+                    <div className="grid gap-3 mt-4">
                       {report.analytics_view.shot_selection.events.map((event) => (
-                        <article className="event-card" key={`${event.timestamp}-${event.shot_type}`}>
-                          <div className="event-heading">
-                            <strong>
-                              {event.timestamp} · {event.shot_type}
+                        <article
+                          className="p-4 border border-slate-200 rounded-xl bg-slate-50"
+                          key={`${event.timestamp}-${event.shot_type}`}
+                        >
+                          <div className="flex flex-col gap-1 mb-2">
+                            <strong className="text-sm text-slate-800">
+                              {event.timestamp} &middot; {event.shot_type}
                             </strong>
-                            <span>
+                            <span className="text-xs text-slate-500">
                               Execution {event.execution_score} / Decision {event.decision_score}
                             </span>
                           </div>
-                          <p className="event-chip">{event.decision_quality}</p>
-                          {event.recommendation ? <p>{event.recommendation}</p> : null}
-                          <p className="label">Evidence</p>
-                          <p className="muted">{event.evidence}</p>
+                          <p className="inline-block px-2 py-1 rounded-full bg-slate-200 text-xs capitalize mb-2">
+                            {event.decision_quality}
+                          </p>
+                          {event.recommendation ? (
+                            <p className="text-sm text-slate-600">{event.recommendation}</p>
+                          ) : null}
+                          <p className="text-xs font-semibold tracking-widest uppercase text-blue-600 mt-2">
+                            Evidence
+                          </p>
+                          <p className="text-xs text-slate-400 mt-1">{event.evidence}</p>
                         </article>
                       ))}
                     </div>
                   </article>
 
-                  <article className="report-card">
-                    <p className="label">Confidence annotations</p>
-                    <div className="annotation-stack">
+                  <article className="sm:col-span-2 p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Confidence annotations
+                    </p>
+                    <div className="grid gap-3 mt-3">
                       {report.confidence_annotations.map((annotation) => (
-                        <article className="annotation-card" key={annotation.field}>
-                          <strong>{annotation.field}</strong>
-                          <span>{Math.round(annotation.confidence * 100)}% confidence</span>
-                          <p>{annotation.reason}</p>
+                        <article
+                          className="p-3 border border-slate-200 rounded-lg grid gap-1"
+                          key={annotation.field}
+                        >
+                          <strong className="text-sm text-slate-700">{annotation.field}</strong>
+                          <span className="text-xs text-blue-600 font-semibold">
+                            {Math.round(annotation.confidence * 100)}% confidence
+                          </span>
+                          <p className="text-xs text-slate-500">{annotation.reason}</p>
                         </article>
                       ))}
                     </div>
@@ -602,16 +786,28 @@ function App() {
           ) : null}
         </section>
 
-        <aside className="insight-rail">
-          <article className="rail-card">
-            <p className="label">Current tracked player</p>
-            <strong>{selectedPlayer?.label ?? report?.tracked_player_label ?? "Waiting for setup"}</strong>
-            <span>{analysis ? formatMatchType(analysis.match_type) : "Choose a match type to begin."}</span>
+        <aside className="grid gap-4">
+          <article className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
+            <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+              Current tracked player
+            </p>
+            <strong className="block mt-2 text-sm text-slate-800">
+              {selectedPlayer?.label ?? report?.tracked_player_label ?? "Waiting for setup"}
+            </strong>
+            <span className="block mt-1 text-xs text-slate-400">
+              {analysis
+                ? formatMatchType(analysis.match_type)
+                : "Choose a match type to begin."}
+            </span>
           </article>
-          <article className="rail-card">
-            <p className="label">AI layer</p>
-            <strong>Typed single-pass placeholder</strong>
-            <span>
+          <article className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
+            <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+              AI layer
+            </p>
+            <strong className="block mt-2 text-sm text-slate-800">
+              Typed single-pass placeholder
+            </strong>
+            <span className="block mt-1 text-xs text-slate-400">
               Structured coach notes can layer on top later without changing the report contract.
             </span>
           </article>
