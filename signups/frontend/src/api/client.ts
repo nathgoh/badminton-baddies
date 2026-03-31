@@ -152,6 +152,14 @@ export async function getAdminSession(id: string): Promise<AdminSessionResponse>
   return request(`/api/admin/sessions/${id}`)
 }
 
+export async function resetSessionCosts(
+  sessionId: string,
+): Promise<{ total_cost: number; confirmed_count: number; base_amount: number }> {
+  return request(`/api/admin/sessions/${sessionId}/reset-costs`, {
+    method: 'POST',
+  })
+}
+
 export async function updateSignupAmount(
   signupId: string,
   amount: number,

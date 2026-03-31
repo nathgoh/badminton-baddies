@@ -59,6 +59,8 @@ export interface AdminSessionResponse {
   total_capacity: number
   confirmed_count: number
   waitlist_count: number
+  current_base_amount: number | null
+  unadjusted_confirmed_count: number
 }
 
 export interface PlayerLookupResponse {
@@ -77,4 +79,3 @@ export interface CostCalculationResult {
   confirmed_count: number
   base_amount: number
 }
-

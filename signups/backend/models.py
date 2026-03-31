@@ -137,3 +137,15 @@ class CostCalculationResult(BaseModel):
     total_cost: float
     confirmed_count: int
     base_amount: float
+
+
+class AdminSessionResponse(BaseModel):
+    session: Session
+    courts: list[Court]
+    signups: list[Signup] = []
+    total_cost: float
+    total_capacity: int
+    confirmed_count: int
+    waitlist_count: int
+    current_base_amount: Optional[float] = None
+    unadjusted_confirmed_count: int = 0

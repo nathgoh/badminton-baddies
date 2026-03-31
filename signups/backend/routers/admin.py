@@ -46,6 +46,8 @@ class AdminSessionResponse(BaseModel):
     total_capacity: int
     confirmed_count: int
     waitlist_count: int
+    current_base_amount: Optional[float] = None
+    unadjusted_confirmed_count: int = 0
 
 
 class SignupAmountUpdate(BaseModel):
@@ -138,14 +140,23 @@ def get_admin_session(
     signups = [signup for signup in storage.get_signups(session_id) if signup.status != SignupStatus.cancelled]
     confirmed = [signup for signup in signups if signup.status == SignupStatus.confirmed]
     waitlist = [signup for signup in signups if signup.status == SignupStatus.waitlist]
+    adjusted = [signup for signup in confirmed if signup.amount_adjusted and signup.amount_owed is not None]
+    unadjusted = [signup for signup in confirmed if not signup.amount_adjusted]
+    total_cost = sum(court.total_cost for court in courts)
+    adjusted_total = round(sum(signup.amount_owed for signup in adjusted), 2)
+    current_base_amount = (
+        round((total_cost - adjusted_total) / len(unadjusted), 2) if unadjusted else None
+    )
     return AdminSessionResponse(
         session=session,
         courts=courts,
         signups=signups,
-        total_cost=sum(court.total_cost for court in courts),
+        total_cost=total_cost,
         total_capacity=sum(court.max_players for court in courts),
         confirmed_count=len(confirmed),
         waitlist_count=len(waitlist),
+        current_base_amount=current_base_amount,
+        unadjusted_confirmed_count=len(unadjusted),
     )
 
 
@@ -153,6 +164,19 @@ def get_admin_session(
 def calculate_costs(
     session_id: str, storage: StorageAdapter = Depends(get_storage)
 ) -> CostCalculationResult:
+    return _recalculate_session_costs(session_id, storage)
+
+
+@router.post("/sessions/{session_id}/reset-costs", response_model=CostCalculationResult)
+def reset_costs(
+    session_id: str, storage: StorageAdapter = Depends(get_storage)
+) -> CostCalculationResult:
+    _get_session_by_id(storage, session_id)
+    confirmed = [
+        signup for signup in storage.get_signups(session_id) if signup.status == SignupStatus.confirmed
+    ]
+    for signup in confirmed:
+        storage.update_signup(signup.id, SignupUpdate(amount_adjusted=False))
     return _recalculate_session_costs(session_id, storage)
 
 
@@ -174,6 +198,17 @@ def update_signup_amount(
                 for signup in storage.get_signups(existing.session_id)
                 if signup.status == SignupStatus.confirmed
             ]
+            projected_unadjusted = [signup for signup in projected_confirmed if not signup.amount_adjusted]
+            if (
+                len(projected_confirmed) > 1
+                and body.amount_adjusted
+                and body.amount_owed != existing.amount_owed
+                and not projected_unadjusted
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No other unadjusted confirmed players remain to absorb the remaining cost.",
+                )
             _validate_projected_confirmed_costs(existing.session_id, storage, projected_confirmed)
 
         updated = storage.update_signup(

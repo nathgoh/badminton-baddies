@@ -113,7 +113,7 @@ export default function CancelSection({ token, expanded, onToggle, onCancelled }
                   onClick={handleCancel}
                   disabled={loading}
                   variant="danger"
-                  className="mt-4"
+                  className="mt-4 w-full px-5 py-3 text-base sm:w-auto sm:text-sm"
                 >
                   {loading ? 'Cancelling...' : 'Cancel my spot'}
                 </Button>

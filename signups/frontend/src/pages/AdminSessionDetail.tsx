@@ -5,7 +5,7 @@ import CostCalculator from '../components/CostCalculator'
 import RosterManager from '../components/RosterManager'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
-import { getAdminSession, updateSession } from '../api/client'
+import { getAdminSession, resetSessionCosts, updateSession } from '../api/client'
 import { formatDisplayDate } from '../utils'
 import type { AdminSessionResponse } from '../types'
 
@@ -13,6 +13,7 @@ export default function AdminSessionDetail() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<AdminSessionResponse | null>(null)
   const [toggling, setToggling] = useState(false)
+  const [resettingCosts, setResettingCosts] = useState(false)
 
   async function load() {
     if (!id) {
@@ -46,6 +47,21 @@ export default function AdminSessionDetail() {
     }
   }
 
+  async function handleResetCosts() {
+    if (!data) return
+    if (!window.confirm('Reset all confirmed players to the evenly divided total?')) return
+
+    setResettingCosts(true)
+    try {
+      await resetSessionCosts(data.session.id)
+      await load()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      setResettingCosts(false)
+    }
+  }
+
   if (!data) {
     return (
       <div
@@ -62,7 +78,7 @@ export default function AdminSessionDetail() {
     )
   }
 
-  const costPerPlayer = data.confirmed_count > 0 ? data.total_cost / data.confirmed_count : undefined
+  const costPerPlayer = data.current_base_amount ?? undefined
 
   return (
     <div
@@ -142,33 +158,43 @@ export default function AdminSessionDetail() {
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
                   Cost split
                 </div>
+                <p className="mt-2 text-sm leading-6 text-slate-100">
+                  Owed amounts update automatically after signup, cancellation, promotion, and
+                  manual adjustments.
+                </p>
                 <div className="mt-3 space-y-3">
                   <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-white/90 px-4 py-3 text-sm text-ink-700">
                     <span>Total court cost</span>
                     <strong className="text-base text-ink-950">${data.total_cost.toFixed(2)}</strong>
                   </div>
-                  {costPerPlayer != null ? (
+                  {data.unadjusted_confirmed_count > 0 && costPerPlayer != null ? (
                     <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-amber-50 px-4 py-3 text-sm text-amber-900">
                       <span>Cost per player</span>
                       <strong className="text-base">${costPerPlayer.toFixed(2)}</strong>
                     </div>
                   ) : null}
-                  <div className="rounded-[1.25rem] bg-white/10 px-4 py-3 text-sm leading-6 text-slate-100">
-                    Owed amounts update automatically after signup, cancellation, promotion, and
-                    manual adjustments.
-                  </div>
+                  <Button
+                    className="w-full border-amber-300 bg-amber-400 text-ink-950 hover:bg-amber-300 focus-visible:ring-amber-200"
+                    onClick={() => void handleResetCosts()}
+                    disabled={resettingCosts || data.confirmed_count === 0}
+                    type="button"
+                  >
+                    {resettingCosts ? 'Resetting...' : 'Reset all to even split'}
+                  </Button>
                 </div>
               </div>
 
-              <Button
-                className="w-full border-white/20 bg-white/10 text-white hover:bg-white/20 focus-visible:ring-white/30"
-                onClick={() => void handleToggleActive()}
-                disabled={toggling}
-                type="button"
-                variant="secondary"
-              >
-                {toggling ? 'Saving...' : data.session.is_active ? 'Close session' : 'Open session'}
-              </Button>
+              <div className="grid gap-3 sm:grid-cols-1">
+                <Button
+                  className="w-full border-white/20 bg-white/10 text-white hover:bg-white/20 focus-visible:ring-white/30"
+                  onClick={() => void handleToggleActive()}
+                  disabled={toggling}
+                  type="button"
+                  variant="secondary"
+                >
+                  {toggling ? 'Saving...' : data.session.is_active ? 'Close session' : 'Open session'}
+                </Button>
+              </div>
             </div>
           </div>
         </section>
@@ -178,7 +204,7 @@ export default function AdminSessionDetail() {
           className="grid gap-4 xl:grid-cols-[minmax(0,0.98fr)_minmax(0,1.02fr)]"
         >
           <CostCalculator data={data} onRefresh={handleRefresh} />
-          <RosterManager signups={data.signups} onRefresh={handleRefresh} costPerPlayer={data.confirmed_count > 0 ? data.total_cost / data.confirmed_count : undefined} />
+          <RosterManager signups={data.signups} onRefresh={handleRefresh} costPerPlayer={data.current_base_amount ?? undefined} />
         </div>
       </div>
     </div>

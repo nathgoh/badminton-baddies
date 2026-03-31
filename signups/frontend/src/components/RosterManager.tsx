@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FocusEvent } from 'react'
 
 import { adminCancelSignup, markSignupPaid, promoteFromWaitlist, updateSignupAmount } from '../api/client'
 import Button from './ui/Button'
@@ -34,8 +34,22 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [dropdownId])
 
-  async function handleSaveAmount(signupId: string) {
-    await updateSignupAmount(signupId, parseFloat(editAmount))
+  async function handleSaveAmount(editedSignup: Signup) {
+    const parsedAmount = parseFloat(editAmount)
+    const noOtherUnadjustedConfirmedPlayersRemain = confirmed.every(
+      (signup) => signup.id === editedSignup.id || signup.amount_adjusted,
+    )
+    const amountChanged = parsedAmount !== editedSignup.amount_owed
+
+    if (
+      amountChanged &&
+      noOtherUnadjustedConfirmedPlayersRemain
+    ) {
+      alert('No other unadjusted confirmed players remain to absorb the remaining cost.')
+      return
+    }
+
+    await updateSignupAmount(editedSignup.id, parsedAmount)
     setEditingId(null)
     await onRefresh()
   }
@@ -81,8 +95,19 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
   }
 
   function startEditingAmount(signup: Signup) {
+    if (signup.paid) {
+      return
+    }
     setEditingId(signup.id)
     setEditAmount(signup.amount_owed != null ? signup.amount_owed.toFixed(2) : '')
+  }
+
+  function handleAmountBlur(event: FocusEvent<HTMLInputElement>) {
+    const nextTarget = event.relatedTarget
+    if (nextTarget instanceof HTMLElement && nextTarget.closest('[data-edit-amount-control="true"]')) {
+      return
+    }
+    setEditingId(null)
   }
 
   return (
@@ -139,6 +164,9 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                     }
                   }}
                   onClick={() => {
+                    if (isEditing) {
+                      return
+                    }
                     if (inputMouseDownRef.current) {
                       inputMouseDownRef.current = false
                       return
@@ -169,6 +197,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                           type="number"
                           step="0.01"
                           min="0"
+                          data-edit-amount-control="true"
                           value={editAmount}
                           onChange={(event) => setEditAmount(event.target.value)}
                           className="w-full rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 sm:max-w-[140px]"
@@ -181,21 +210,22 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                           onKeyDown={(event) => {
                             if (event.key === 'Enter') {
                               event.stopPropagation()
-                              void handleSaveAmount(signup.id)
+                              void handleSaveAmount(signup)
                             }
                           }}
-                          onBlur={() => setTimeout(() => setEditingId(null), 150)}
+                          onBlur={handleAmountBlur}
                         />
                       ) : (
                         <span
                           role="button"
                           tabIndex={0}
-                          className={`cursor-pointer rounded-full px-5 py-2.5 text-base font-semibold transition hover:opacity-80 ${
+                          data-edit-amount-control="true"
+                          className={`rounded-full px-5 py-2.5 text-base font-semibold transition ${
                             isPaid
-                              ? 'bg-emerald-200 text-emerald-900'
+                              ? 'cursor-default bg-emerald-200 text-emerald-900'
                               : signup.amount_adjusted && signup.amount_owed !== costPerPlayer
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-slate-100 text-slate-700'
+                                ? 'cursor-pointer bg-blue-100 text-blue-800 hover:opacity-80'
+                                : 'cursor-pointer bg-slate-100 text-slate-700 hover:opacity-80'
                           }`}
                           onClick={(event) => {
                             event.stopPropagation()
@@ -216,6 +246,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                         <button
                           type="button"
                           aria-label="More options"
+                          disabled={isEditing}
                           className="rounded-full p-2 text-lg text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
                           onClick={(event) => {
                             event.stopPropagation()
@@ -260,9 +291,10 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                   <div className="pt-3">
                     <Button
                       type="button"
+                      data-edit-amount-control="true"
                       className="w-full sm:w-auto"
                       onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => void handleSaveAmount(signup.id)}
+                      onClick={() => void handleSaveAmount(signup)}
                     >
                       Save
                     </Button>

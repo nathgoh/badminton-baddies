@@ -19,4 +19,26 @@ describe('RosterManager structure hooks', () => {
     expect(RosterManagerSource).toContain('Mark all unpaid')
     expect(RosterManagerSource).toContain('Tap card to mark paid')
   })
+
+  it('locks the card interactions while an amount input is open', () => {
+    expect(RosterManagerSource).toContain('disabled={isEditing}')
+    expect(RosterManagerSource).toContain("if (isEditing) {")
+  })
+
+  it('does not use delayed blur cleanup that can close the next editor', () => {
+    expect(RosterManagerSource).not.toContain('setTimeout(() => setEditingId(null), 150)')
+    expect(RosterManagerSource).toContain('relatedTarget')
+  })
+
+  it('does not allow amount editing for paid players', () => {
+    expect(RosterManagerSource).toContain('if (signup.paid) {')
+    expect(RosterManagerSource).toContain('cursor-default')
+  })
+
+  it('hard-stops saving when no other unadjusted confirmed players remain', () => {
+    expect(RosterManagerSource).toContain('signup.id === editedSignup.id || signup.amount_adjusted')
+    expect(RosterManagerSource).toContain('noOtherUnadjustedConfirmedPlayersRemain')
+    expect(RosterManagerSource).toContain('No other unadjusted confirmed players remain to absorb the remaining cost.')
+    expect(RosterManagerSource).toContain('alert(')
+  })
 })

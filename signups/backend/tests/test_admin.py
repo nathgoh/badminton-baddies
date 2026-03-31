@@ -60,6 +60,29 @@ def test_get_admin_session(client):
     assert data["session"]["id"] == session["id"]
     assert data["total_cost"] == 30.0
     assert data["total_capacity"] == 4
+    assert data["current_base_amount"] is None
+    assert data["unadjusted_confirmed_count"] == 0
+
+
+def test_get_admin_session_includes_dynamic_base_amount_for_unadjusted_players(client):
+    session = _setup(client)
+    token = session["access_token"]
+    alice = _signup(client, token, "a@t.com", "Alice").json()
+    _signup(client, token, "b@t.com", "Bob")
+    _signup(client, token, "c@t.com", "Carol")
+
+    patch_response = client.patch(
+        f"/api/admin/signups/{alice['id']}",
+        json={"amount_owed": 6.0, "amount_adjusted": True},
+    )
+    assert patch_response.status_code == 200
+
+    response = client.get(f"/api/admin/sessions/{session['id']}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["current_base_amount"] == 12.0
+    assert data["unadjusted_confirmed_count"] == 2
 
 
 def test_calculate_costs(client):
@@ -364,6 +387,37 @@ def test_manual_amount_edit_on_waitlist_does_not_recalculate_costs(client, monke
     assert response.json()["amount_owed"] == 9.0
 
 
+def test_reset_all_costs_to_even_split_clears_manual_adjustments(client):
+    session = _setup(client)
+    token = session["access_token"]
+    alice = _signup(client, token, "a@t.com", "Alice").json()
+    bob = _signup(client, token, "b@t.com", "Bob").json()
+    _signup(client, token, "c@t.com", "Carol").json()
+
+    client.patch(
+        f"/api/admin/signups/{alice['id']}",
+        json={"amount_owed": 6.0, "amount_adjusted": True},
+    )
+    client.patch(
+        f"/api/admin/signups/{bob['id']}",
+        json={"amount_owed": 8.0, "amount_adjusted": True},
+    )
+
+    response = client.post(f"/api/admin/sessions/{session['id']}/reset-costs")
+
+    assert response.status_code == 200
+    assert response.json()["base_amount"] == 10.0
+
+    session_response = client.get(f"/api/admin/sessions/{session['id']}")
+    signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
+    assert signups["a@t.com"]["amount_owed"] == 10.0
+    assert signups["b@t.com"]["amount_owed"] == 10.0
+    assert signups["c@t.com"]["amount_owed"] == 10.0
+    assert signups["a@t.com"]["amount_adjusted"] is False
+    assert signups["b@t.com"]["amount_adjusted"] is False
+    assert signups["c@t.com"]["amount_adjusted"] is False
+
+
 def test_waitlist_cancel_does_not_recalculate_costs(client, storage):
     session = _setup(client)
     token = session["access_token"]
@@ -531,6 +585,7 @@ def test_invalid_manual_amount_edit_does_not_persist_attempted_change(client):
     assert signups["a@t.com"]["amount_adjusted"] is True
     assert signups["b@t.com"]["amount_owed"] == 5.0
     assert signups["b@t.com"]["amount_adjusted"] is False
+    assert "No other unadjusted confirmed players remain" in response.json()["detail"]
 
 
 def test_negative_manual_amount_edit_is_rejected(client):
