@@ -329,10 +329,12 @@ def test_admin_cancel_with_waitlist_promotion_recalculates_once_for_final_roster
     eve = _signup(client, token, "e@t.com", "Eve").json()
 
     helper_calls = 0
+    original_recalculate_session_costs = admin_router._recalculate_session_costs
 
     def counting_recalculate_session_costs(*args, **kwargs):
         nonlocal helper_calls
         helper_calls += 1
+        return original_recalculate_session_costs(*args, **kwargs)
 
     monkeypatch.setattr(
         admin_router,

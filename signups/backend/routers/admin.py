@@ -144,10 +144,12 @@ def update_signup_amount(
     storage: StorageAdapter = Depends(get_storage),
 ) -> Signup:
     try:
-        return storage.update_signup(
+        updated = storage.update_signup(
             signup_id,
             SignupUpdate(amount_owed=body.amount_owed, amount_adjusted=body.amount_adjusted),
         )
+        _recalculate_session_costs(updated.session_id, storage)
+        return next(item for item in storage.get_signups(updated.session_id) if item.id == signup_id)
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signup not found") from exc
 
@@ -169,7 +171,9 @@ def mark_paid(
 @router.post("/signups/{signup_id}/promote", response_model=Signup)
 def promote_from_waitlist(signup_id: str, storage: StorageAdapter = Depends(get_storage)) -> Signup:
     try:
-        return storage.update_signup(signup_id, SignupUpdate(status=SignupStatus.confirmed))
+        promoted = storage.update_signup(signup_id, SignupUpdate(status=SignupStatus.confirmed))
+        _recalculate_session_costs(promoted.session_id, storage)
+        return next(item for item in storage.get_signups(promoted.session_id) if item.id == signup_id)
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signup not found") from exc
 
@@ -177,11 +181,23 @@ def promote_from_waitlist(signup_id: str, storage: StorageAdapter = Depends(get_
 @router.delete("/signups/{signup_id}", response_model=Signup)
 def cancel_signup(signup_id: str, storage: StorageAdapter = Depends(get_storage)) -> Signup:
     try:
+        signup = None
+        session_id = None
+        for session in storage.list_sessions():
+            signup = next((item for item in storage.get_signups(session.id) if item.id == signup_id), None)
+            if signup is not None:
+                session_id = session.id
+                break
+        if signup is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signup not found")
+        was_confirmed = signup.status == SignupStatus.confirmed
         cancelled = storage.update_signup(
             signup_id,
             SignupUpdate(status=SignupStatus.cancelled, cancelled_at=datetime.now(timezone.utc)),
         )
-        _promote_next_from_waitlist(cancelled.session_id, storage)
+        _promote_next_from_waitlist(session_id, storage)
+        if was_confirmed:
+            _recalculate_session_costs(session_id, storage)
         return cancelled
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signup not found") from exc

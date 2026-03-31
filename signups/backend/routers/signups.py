@@ -1,4 +1,5 @@
 from datetime import datetime, time, timedelta, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -53,7 +54,7 @@ def _cancellation_cutoff(session_datetime_date, cancel_window_hours: int) -> dat
     return session_start - timedelta(hours=cancel_window_hours)
 
 
-def _promote_next_from_waitlist(session_id: str, storage: StorageAdapter) -> None:
+def _promote_next_from_waitlist(session_id: str, storage: StorageAdapter) -> Optional[Signup]:
     courts = storage.get_courts(session_id)
     total_capacity = sum(court.max_players for court in courts)
     signups = storage.get_signups(session_id)
@@ -64,7 +65,14 @@ def _promote_next_from_waitlist(session_id: str, storage: StorageAdapter) -> Non
             key=lambda s: s.timestamp,
         )
         if waitlisted:
-            storage.update_signup(waitlisted[0].id, SignupUpdate(status=SignupStatus.confirmed))
+            return storage.update_signup(waitlisted[0].id, SignupUpdate(status=SignupStatus.confirmed))
+    return None
+
+
+try:
+    from . import admin as admin_router
+except ImportError:
+    import routers.admin as admin_router
 
 
 @router.get("/public/{token}", response_model=PublicSessionResponse)
@@ -121,6 +129,9 @@ def create_signup(
     storage.upsert_player(
         PlayerUpsert(email=body.email, name=body.name, venmo_or_phone=body.venmo_or_phone)
     )
+    if signup.status == SignupStatus.confirmed:
+        admin_router._recalculate_session_costs(session.id, storage)
+        signup = next(item for item in storage.get_signups(session.id) if item.id == signup.id)
     return signup
 
 
@@ -175,9 +186,12 @@ def cancel_signup(
     if datetime.now(timezone.utc) >= _cancellation_cutoff(session.date, session.cancel_window_hours):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancellation window has closed")
 
+    was_confirmed = signup.status == SignupStatus.confirmed
     cancelled = storage.update_signup(
         signup.id,
         SignupUpdate(status=SignupStatus.cancelled, cancelled_at=datetime.now(timezone.utc)),
     )
     _promote_next_from_waitlist(session.id, storage)
+    if was_confirmed:
+        admin_router._recalculate_session_costs(session.id, storage)
     return cancelled
