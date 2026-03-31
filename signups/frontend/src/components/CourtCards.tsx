@@ -46,7 +46,7 @@ export default function CourtCards({
           {isFull ? 'Full' : 'Open'}
         </div>
       </div>
-      <div className="grid gap-3 rounded-[1.5rem] bg-sand-50/80 p-4 text-sm text-ink-700 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-3 rounded-[1.5rem] bg-sand-50/80 p-4 text-sm text-ink-700">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-700">
             Confirmed
