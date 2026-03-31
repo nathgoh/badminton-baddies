@@ -2,15 +2,31 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 try:
     from ..dependencies import get_storage
-    from ..models import Court, CourtCreate, CourtUpdate, Session, SessionCreate, SessionUpdate
+    from ..models import Court, CourtCreate, CourtUpdate, Session, SessionCreate, SessionUpdate, SignupStatus
     from ..storage.adapter import StorageAdapter
+    from .admin import _recalculate_session_costs
 except ImportError:
     from dependencies import get_storage
-    from models import Court, CourtCreate, CourtUpdate, Session, SessionCreate, SessionUpdate
+    from models import Court, CourtCreate, CourtUpdate, Session, SessionCreate, SessionUpdate, SignupStatus
     from storage.adapter import StorageAdapter
+    from routers.admin import _recalculate_session_costs
 
 
 router = APIRouter()
+
+
+def _get_court_by_id(storage: StorageAdapter, court_id: str) -> Court:
+    for session in storage.list_sessions():
+        court = next((item for item in storage.get_courts(session.id) if item.id == court_id), None)
+        if court is not None:
+            return court
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Court not found")
+
+
+def _has_confirmed_signups(session_id: str, storage: StorageAdapter) -> bool:
+    return any(
+        signup.status == SignupStatus.confirmed for signup in storage.get_signups(session_id)
+    )
 
 
 @router.get("/sessions", response_model=list[Session])
@@ -68,7 +84,10 @@ def create_court(
     storage: StorageAdapter = Depends(get_storage),
 ) -> Court:
     payload = CourtCreate(session_id=session_id, **data.model_dump(exclude={"session_id"}))
-    return storage.create_court(payload)
+    court = storage.create_court(payload)
+    if _has_confirmed_signups(session_id, storage):
+        _recalculate_session_costs(session_id, storage)
+    return court
 
 
 @router.patch("/courts/{court_id}", response_model=Court)
@@ -76,16 +95,18 @@ def update_court(
     court_id: str, data: CourtUpdate, storage: StorageAdapter = Depends(get_storage)
 ) -> Court:
     try:
-        return storage.update_court(court_id, data)
+        court = storage.update_court(court_id, data)
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Court not found") from exc
+    if _has_confirmed_signups(court.session_id, storage):
+        _recalculate_session_costs(court.session_id, storage)
+    return court
 
 
 @router.delete("/courts/{court_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_court(court_id: str, storage: StorageAdapter = Depends(get_storage)) -> Response:
-    try:
-        storage.delete_court(court_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Court not found") from exc
+    court = _get_court_by_id(storage, court_id)
+    storage.delete_court(court_id)
+    if _has_confirmed_signups(court.session_id, storage):
+        _recalculate_session_costs(court.session_id, storage)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-

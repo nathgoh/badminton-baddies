@@ -1,3 +1,47 @@
+def _create_session(client, *, is_active=False):
+    response = client.post(
+        "/api/sessions",
+        json={"name": "S1", "date": "2026-04-01", "is_active": is_active},
+    )
+    return response.json()
+
+
+def _create_court(client, session_id, *, total_cost=20.0, max_players=4):
+    response = client.post(
+        f"/api/sessions/{session_id}/courts",
+        json={
+            "name": "Court A",
+            "start_time": "19:00",
+            "end_time": "22:00",
+            "max_players": max_players,
+            "total_cost": total_cost,
+        },
+    )
+    return response
+
+
+def _signup(client, token, email, name):
+    response = client.post(
+        f"/api/public/{token}/signup",
+        json={
+            "email": email,
+            "name": name,
+            "venmo_or_phone": "@x",
+            "payment_agreed": True,
+        },
+    )
+    return response
+
+
+def _amounts_by_email(client, session_id):
+    response = client.get(f"/api/admin/sessions/{session_id}")
+    return {
+        signup["email"]: signup["amount_owed"]
+        for signup in response.json()["signups"]
+        if signup["status"] == "confirmed"
+    }
+
+
 def test_list_sessions_empty(client):
     response = client.get("/api/sessions")
 
@@ -86,41 +130,81 @@ def test_delete_session_removes_signups(client, storage):
 
 
 def test_create_court(client):
-    session_response = client.post("/api/sessions", json={"name": "S1", "date": "2026-03-25"})
-    session_id = session_response.json()["id"]
+    session_id = _create_session(client)["id"]
 
-    response = client.post(
-        f"/api/sessions/{session_id}/courts",
-        json={
-            "name": "Doubles Court",
-            "start_time": "19:00",
-            "end_time": "22:00",
-            "max_players": 18,
-            "total_cost": 150.0,
-        },
-    )
+    response = _create_court(client, session_id, total_cost=150.0, max_players=18)
 
     assert response.status_code == 201
     data = response.json()
     assert data["session_id"] == session_id
-    assert data["name"] == "Doubles Court"
+    assert data["name"] == "Court A"
 
 
 def test_delete_court(client):
-    session_response = client.post("/api/sessions", json={"name": "S1", "date": "2026-03-25"})
-    session_id = session_response.json()["id"]
-    court_response = client.post(
-        f"/api/sessions/{session_id}/courts",
-        json={
-            "name": "Court A",
-            "start_time": "19:00",
-            "end_time": "22:00",
-            "max_players": 10,
-            "total_cost": 100.0,
-        },
-    )
+    session_id = _create_session(client)["id"]
+    court_response = _create_court(client, session_id, total_cost=100.0, max_players=10)
     court_id = court_response.json()["id"]
 
     response = client.delete(f"/api/courts/{court_id}")
 
     assert response.status_code == 204
+
+
+def test_create_court_recalculates_costs_for_confirmed_signups(client):
+    session = _create_session(client, is_active=True)
+    session_id = session["id"]
+    token = session["access_token"]
+    _create_court(client, session_id, total_cost=20.0, max_players=4)
+    _signup(client, token, "a@t.com", "Alice")
+    _signup(client, token, "b@t.com", "Bob")
+
+    response = _create_court(client, session_id, total_cost=10.0, max_players=2)
+
+    assert response.status_code == 201
+    assert _amounts_by_email(client, session_id) == {
+        "a@t.com": 15.0,
+        "b@t.com": 15.0,
+    }
+
+
+def test_update_court_recalculates_costs_for_confirmed_signups(client):
+    session = _create_session(client, is_active=True)
+    session_id = session["id"]
+    token = session["access_token"]
+    court_id = _create_court(client, session_id, total_cost=20.0, max_players=4).json()["id"]
+    _signup(client, token, "a@t.com", "Alice")
+    _signup(client, token, "b@t.com", "Bob")
+
+    response = client.patch(f"/api/courts/{court_id}", json={"total_cost": 30.0})
+
+    assert response.status_code == 200
+    assert _amounts_by_email(client, session_id) == {
+        "a@t.com": 15.0,
+        "b@t.com": 15.0,
+    }
+
+
+def test_delete_court_recalculates_costs_for_confirmed_signups(client):
+    session = _create_session(client, is_active=True)
+    session_id = session["id"]
+    token = session["access_token"]
+    _create_court(client, session_id, total_cost=20.0, max_players=4)
+    extra_court_id = _create_court(client, session_id, total_cost=10.0, max_players=2).json()["id"]
+    _signup(client, token, "a@t.com", "Alice")
+    _signup(client, token, "b@t.com", "Bob")
+
+    response = client.delete(f"/api/courts/{extra_court_id}")
+
+    assert response.status_code == 204
+    assert _amounts_by_email(client, session_id) == {
+        "a@t.com": 10.0,
+        "b@t.com": 10.0,
+    }
+
+
+def test_create_court_with_no_confirmed_signups_does_not_error(client):
+    session_id = _create_session(client, is_active=True)["id"]
+
+    response = _create_court(client, session_id, total_cost=20.0, max_players=4)
+
+    assert response.status_code == 201
