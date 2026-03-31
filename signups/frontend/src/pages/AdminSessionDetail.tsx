@@ -76,6 +76,14 @@ export default function AdminSessionDetail() {
       className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
     >
       <div className="space-y-5">
+        <Link
+          className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-ink-900 transition hover:bg-slate-50"
+          to="/admin"
+        >
+          <span aria-hidden="true">←</span>
+          Back to sessions
+        </Link>
+
         <section
           data-testid="admin-detail-hero"
           className="relative overflow-hidden rounded-[2rem] bg-ink-950 px-5 py-6 text-white shadow-soft sm:px-8 sm:py-8"
@@ -84,13 +92,6 @@ export default function AdminSessionDetail() {
           <div className="relative space-y-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-3xl space-y-3">
-                <Link
-                  className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/15"
-                  to="/admin"
-                >
-                  <span aria-hidden="true">←</span>
-                  Back to sessions
-                </Link>
                 <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sand-50">
                   Session detail
                 </div>
