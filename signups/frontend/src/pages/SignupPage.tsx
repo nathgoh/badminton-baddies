@@ -148,16 +148,26 @@ export default function SignupPage() {
             />
           </div>
           {successSignup ? (
-            <Card className="space-y-2 border-ink-950/70 bg-ink-950 text-white">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+            <Card
+              className={`space-y-2 ${
+                successSignup.status === 'confirmed'
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : 'border-amber-200 bg-amber-50'
+              }`}
+            >
+              <p
+                className={`text-xs font-semibold uppercase tracking-[0.18em] ${
+                  successSignup.status === 'confirmed' ? 'text-emerald-700' : 'text-amber-700'
+                }`}
+              >
                 {successSignup.status === 'confirmed' ? 'Confirmed' : 'Waitlist'}
               </p>
-              <div className="text-2xl font-semibold">
+              <div className="text-2xl font-semibold text-ink-950">
                 {successSignup.status === 'confirmed'
                   ? "You're signed up!"
                   : "You've been added to the waitlist."}
               </div>
-              <p className="text-sm text-slate-200">Your roster spot will refresh automatically below.</p>
+              <p className="text-sm text-ink-700">Your roster spot will refresh automatically below.</p>
             </Card>
           ) : (
             <SignupForm
