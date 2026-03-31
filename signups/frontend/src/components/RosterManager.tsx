@@ -130,6 +130,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                           autoFocus
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); void handleSaveAmount(signup.id) } }}
+                          onBlur={() => setTimeout(() => setEditingId(null), 150)}
                         />
                       ) : (
                         <span
@@ -186,14 +187,12 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
 
                 {isEditing ? (
                   <div className="flex gap-3 pt-3">
-                    <Button type="button" onClick={() => void handleSaveAmount(signup.id)}>
+                    <Button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => void handleSaveAmount(signup.id)}
+                    >
                       Save
-                    </Button>
-                    <Button type="button" variant="secondary" onClick={() => setEditAmount(originalAmount)}>
-                      Reset
-                    </Button>
-                    <Button type="button" variant="secondary" onClick={() => setEditingId(null)}>
-                      Cancel
                     </Button>
                   </div>
                 ) : null}
