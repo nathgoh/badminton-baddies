@@ -243,28 +243,52 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
             </div>
           </div>
           <div className="space-y-3">
-            {waitlisted.map((signup) => (
-              <article
-                key={signup.id}
-                className="rounded-[1.5rem] border border-amber-200 bg-white/80 p-4"
-              >
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <div className="text-lg font-semibold text-ink-950">{signup.name}</div>
-                    <div className="break-all text-sm text-ink-700">{signup.email}</div>
-                  </div>
+            {waitlisted.map((signup) => {
+              const isDropdownOpen = dropdownId === signup.id
+              return (
+                <article
+                  key={signup.id}
+                  className="rounded-[1.5rem] border border-amber-200 bg-white/80 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <div className="text-lg font-semibold text-ink-950">{signup.name}</div>
+                      <div className="break-all text-sm text-ink-700">{signup.email}</div>
+                    </div>
 
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <Button type="button" onClick={() => void handlePromote(signup.id)}>
-                      Promote
-                    </Button>
-                    <Button type="button" variant="danger" onClick={() => void handleCancel(signup.id)}>
-                      Cancel
-                    </Button>
+                    <div className="relative shrink-0" ref={isDropdownOpen ? dropdownRef : undefined}>
+                      <button
+                        type="button"
+                        aria-label="More options"
+                        className="rounded-full p-2 text-lg text-slate-400 transition hover:bg-amber-100 hover:text-slate-600"
+                        onClick={() => setDropdownId(isDropdownOpen ? null : signup.id)}
+                      >
+                        ⚙
+                      </button>
+
+                      {isDropdownOpen ? (
+                        <div className="absolute right-0 top-full z-10 mt-1 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+                          <button
+                            type="button"
+                            className="w-full px-4 py-3 text-left text-sm text-ink-900 transition hover:bg-slate-50"
+                            onClick={() => { setDropdownId(null); void handlePromote(signup.id) }}
+                          >
+                            Promote to confirmed
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full px-4 py-3 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50"
+                            onClick={(e) => { e.stopPropagation(); void handleCancel(signup.id) }}
+                          >
+                            Cancel signup
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              )
+            })}
           </div>
         </Card>
       ) : null}
