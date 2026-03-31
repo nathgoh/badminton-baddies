@@ -83,8 +83,15 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
-                      <div className={`text-lg font-semibold ${isPaid ? 'text-emerald-900' : 'text-ink-950'}`}>
-                        {signup.name}
+                      <div className="flex items-center gap-2">
+                        <span className={`text-lg font-semibold ${isPaid ? 'text-emerald-900' : 'text-ink-950'}`}>
+                          {signup.name}
+                        </span>
+                        {isPaid ? (
+                          <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-white">
+                            Paid
+                          </span>
+                        ) : null}
                       </div>
                       <div className={`break-all text-sm ${isPaid ? 'text-emerald-700' : 'text-ink-700'}`}>
                         {signup.email}
