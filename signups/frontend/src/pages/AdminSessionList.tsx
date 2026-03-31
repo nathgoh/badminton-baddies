@@ -6,7 +6,15 @@ import Card from '../components/ui/Card'
 import { createCourt, createSession, deleteSession, getAdminSession, listSessions } from '../api/client'
 import { useAdminAuth } from '../auth/useAdminAuth'
 import { isPastSession } from '../utils'
-import type { AdminSessionResponse } from '../types'
+import type { AdminSessionResponse, Session } from '../types'
+
+const PAST_LIMIT_DAYS = 30
+
+function isWithinPastLimit(date: string): boolean {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - PAST_LIMIT_DAYS)
+  return new Date(date + 'T00:00:00') >= cutoff
+}
 
 interface NewCourtForm {
   name: string
@@ -40,13 +48,29 @@ export default function AdminSessionList() {
     { name: '', start_time: '19:00', end_time: '22:00', max_players: '6', total_cost: '' },
   ])
   const [error, setError] = useState<string | null>(null)
+  const [olderPastSessions, setOlderPastSessions] = useState<Session[]>([])
+  const [loadingMore, setLoadingMore] = useState(false)
   const { logout, email } = useAdminAuth()
   const navigate = useNavigate()
 
   async function load() {
     const list = await listSessions()
-    const details = await Promise.all(list.map((s) => getAdminSession(s.id)))
+    const visible = list.filter((s) => !isPastSession(s.date) || isWithinPastLimit(s.date))
+    const older = list.filter((s) => isPastSession(s.date) && !isWithinPastLimit(s.date))
+    const details = await Promise.all(visible.map((s) => getAdminSession(s.id)))
     setSessions(details)
+    setOlderPastSessions(older)
+  }
+
+  async function handleLoadMore() {
+    setLoadingMore(true)
+    try {
+      const details = await Promise.all(olderPastSessions.map((s) => getAdminSession(s.id)))
+      setSessions((prev) => [...prev, ...details])
+      setOlderPastSessions([])
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
   useEffect(() => {
@@ -449,6 +473,17 @@ export default function AdminSessionList() {
           ) : null}
 
           {pastSessions.map(renderCard)}
+
+          {olderPastSessions.length > 0 ? (
+            <Card className="flex items-center justify-between gap-4">
+              <p className="text-sm text-ink-700">
+                {olderPastSessions.length} older session{olderPastSessions.length === 1 ? '' : 's'} not shown
+              </p>
+              <Button onClick={() => void handleLoadMore()} type="button" variant="secondary" disabled={loadingMore}>
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </Button>
+            </Card>
+          ) : null}
         </div>
       </div>
     </div>
