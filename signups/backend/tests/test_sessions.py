@@ -140,6 +140,14 @@ def test_create_court(client):
     assert data["name"] == "Court A"
 
 
+def test_create_court_rejects_negative_total_cost(client):
+    session_id = _create_session(client)["id"]
+
+    response = _create_court(client, session_id, total_cost=-10.0, max_players=4)
+
+    assert response.status_code == 422
+
+
 def test_delete_court(client):
     session_id = _create_session(client)["id"]
     court_response = _create_court(client, session_id, total_cost=100.0, max_players=10)

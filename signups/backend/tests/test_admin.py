@@ -531,3 +531,16 @@ def test_invalid_manual_amount_edit_does_not_persist_attempted_change(client):
     assert signups["a@t.com"]["amount_adjusted"] is True
     assert signups["b@t.com"]["amount_owed"] == 5.0
     assert signups["b@t.com"]["amount_adjusted"] is False
+
+
+def test_negative_manual_amount_edit_is_rejected(client):
+    session = _setup(client)
+    token = session["access_token"]
+    alice = _signup(client, token, "a@t.com", "Alice").json()
+
+    response = client.patch(
+        f"/api/admin/signups/{alice['id']}",
+        json={"amount_owed": -5.0, "amount_adjusted": True},
+    )
+
+    assert response.status_code == 422

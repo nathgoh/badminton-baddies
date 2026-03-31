@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 try:
     from ..dependencies import get_storage
@@ -49,7 +49,7 @@ class AdminSessionResponse(BaseModel):
 
 
 class SignupAmountUpdate(BaseModel):
-    amount_owed: float
+    amount_owed: float = Field(ge=0)
     amount_adjusted: bool = True
 
 

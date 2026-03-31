@@ -75,6 +75,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                       <input
                         type="number"
                         step="0.01"
+                        min="0"
                         value={editAmount}
                         onChange={(event) => setEditAmount(event.target.value)}
                         className="w-full rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 sm:max-w-[140px]"
