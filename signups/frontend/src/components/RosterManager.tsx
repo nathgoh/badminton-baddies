@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { adminCancelSignup, markSignupPaid, promoteFromWaitlist, updateSignupAmount } from '../api/client'
 import Button from './ui/Button'
@@ -8,19 +8,40 @@ import type { Signup } from '../types'
 interface Props {
   signups: Signup[]
   onRefresh: () => void
+  costPerPlayer?: number
 }
 
-export default function RosterManager({ signups, onRefresh }: Props) {
+export default function RosterManager({ signups, onRefresh, costPerPlayer }: Props) {
   const confirmed = signups.filter((signup) => signup.status === 'confirmed')
   const waitlisted = signups.filter((signup) => signup.status === 'waitlist')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState('')
   const [originalAmount, setOriginalAmount] = useState('')
   const [optimisticPaid, setOptimisticPaid] = useState<Record<string, boolean>>({})
+  const [dropdownId, setDropdownId] = useState<string | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!dropdownId) return
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [dropdownId])
 
   async function handleSaveAmount(signupId: string) {
     await updateSignupAmount(signupId, parseFloat(editAmount))
     setEditingId(null)
+    onRefresh()
+  }
+
+  async function handleResetAmount(signupId: string) {
+    if (costPerPlayer == null) return
+    setDropdownId(null)
+    await updateSignupAmount(signupId, costPerPlayer)
     onRefresh()
   }
 
@@ -36,9 +57,8 @@ export default function RosterManager({ signups, onRefresh }: Props) {
   }
 
   async function handleCancel(signupId: string) {
-    if (!window.confirm('Cancel this signup?')) {
-      return
-    }
+    setDropdownId(null)
+    if (!window.confirm('Cancel this signup?')) return
     await adminCancelSignup(signupId)
     onRefresh()
   }
@@ -64,6 +84,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
           {confirmed.map((signup) => {
             const isEditing = editingId === signup.id
             const isPaid = optimisticPaid[signup.id] ?? signup.paid
+            const isDropdownOpen = dropdownId === signup.id
 
             return (
               <article
@@ -81,7 +102,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                   data-testid="roster-payment-toggle"
                   onClick={() => void handleTogglePaid(signup.id, isPaid)}
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 space-y-1">
                       <div className="flex items-center gap-2">
                         <span className={`text-lg font-semibold ${isPaid ? 'text-emerald-900' : 'text-ink-950'}`}>
@@ -114,7 +135,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                         <span
                           role="button"
                           tabIndex={0}
-                          className={`cursor-pointer rounded-full px-4 py-2 text-sm font-semibold transition hover:opacity-80 ${
+                          className={`cursor-pointer rounded-full px-5 py-2.5 text-base font-semibold transition hover:opacity-80 ${
                             signup.amount_adjusted
                               ? 'bg-amber-100 text-amber-800'
                               : isPaid
@@ -127,14 +148,38 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                           {signup.amount_owed != null ? `$${signup.amount_owed.toFixed(2)}` : '—'}
                         </span>
                       )}
-                      <button
-                        type="button"
-                        aria-label="Cancel signup"
-                        className="rounded-full p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-                        onClick={(e) => { e.stopPropagation(); void handleCancel(signup.id) }}
-                      >
-                        ⚙
-                      </button>
+
+                      <div className="relative" ref={isDropdownOpen ? dropdownRef : undefined}>
+                        <button
+                          type="button"
+                          aria-label="More options"
+                          className="rounded-full p-2 text-lg text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
+                          onClick={(e) => { e.stopPropagation(); setDropdownId(isDropdownOpen ? null : signup.id) }}
+                        >
+                          ⚙
+                        </button>
+
+                        {isDropdownOpen ? (
+                          <div className="absolute right-0 top-full z-10 mt-1 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+                            {costPerPlayer != null ? (
+                              <button
+                                type="button"
+                                className="w-full px-4 py-3 text-left text-sm text-ink-900 transition hover:bg-slate-50"
+                                onClick={(e) => { e.stopPropagation(); void handleResetAmount(signup.id) }}
+                              >
+                                Reset to ${costPerPlayer.toFixed(2)} / player
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="w-full px-4 py-3 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50"
+                              onClick={(e) => { e.stopPropagation(); void handleCancel(signup.id) }}
+                            >
+                              Cancel signup
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 </button>

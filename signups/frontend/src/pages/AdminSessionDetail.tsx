@@ -194,7 +194,11 @@ export default function AdminSessionDetail() {
           className="grid gap-4 xl:grid-cols-[minmax(0,0.98fr)_minmax(0,1.02fr)]"
         >
           <CostCalculator data={data} onRefresh={() => void load()} />
-          <RosterManager signups={data.signups} onRefresh={() => void load()} />
+          <RosterManager
+            signups={data.signups}
+            onRefresh={() => void load()}
+            costPerPlayer={data.confirmed_count > 0 ? (result?.base_amount ?? data.total_cost / data.confirmed_count) : undefined}
+          />
         </div>
       </div>
     </div>
