@@ -90,8 +90,8 @@ export default function AdminSessionDetail() {
         >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.18),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(245,158,11,0.18),_transparent_30%)]" />
           <div className="relative space-y-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-3xl space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 space-y-3">
                 <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sand-50">
                   Session detail
                 </div>
@@ -106,23 +106,15 @@ export default function AdminSessionDetail() {
                 </div>
               </div>
 
-              <div className="rounded-[1.5rem] border border-white/15 bg-white/10 px-4 py-4 backdrop-blur-sm sm:min-w-[220px]">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
-                  Session status
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <span className="text-sm text-slate-200">Access to the public signup</span>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
-                      data.session.is_active
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-white/15 text-white'
-                    }`}
-                  >
-                    {data.session.is_active ? 'Active' : 'Draft'}
-                  </span>
-                </div>
-              </div>
+              <span
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                  data.session.is_active
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}
+              >
+                {data.session.is_active ? 'Active' : 'Draft'}
+              </span>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
