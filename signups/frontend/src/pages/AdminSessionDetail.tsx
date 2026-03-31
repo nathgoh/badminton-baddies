@@ -153,26 +153,39 @@ export default function AdminSessionDetail() {
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(280px,0.92fr)] lg:items-stretch">
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur-sm lg:p-5">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
                   Cost split
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-100">
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-100">
                   Owed amounts update automatically after signup, cancellation, promotion, and
                   manual adjustments.
                 </p>
-                <div className="mt-3 space-y-3">
-                  <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-white/90 px-4 py-3 text-sm text-ink-700">
+                <div className="mt-4 space-y-3 lg:space-y-2.5">
+                  <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-white/90 px-4 py-3 text-sm text-ink-700 lg:px-5">
                     <span>Total court cost</span>
                     <strong className="text-base text-ink-950">${data.total_cost.toFixed(2)}</strong>
                   </div>
                   {data.unadjusted_confirmed_count > 0 && costPerPlayer != null ? (
-                    <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-amber-50 px-4 py-3 text-sm text-amber-900 lg:px-5">
                       <span>Cost per player</span>
                       <strong className="text-base">${costPerPlayer.toFixed(2)}</strong>
                     </div>
                   ) : null}
+                </div>
+              </div>
+
+              <div className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/8 p-4 backdrop-blur-sm lg:content-between lg:p-5">
+                <div className="space-y-3">
+                  <div className="rounded-[1.25rem] border border-white/10 bg-white/10 px-4 py-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                      Actions
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-100">
+                      Use these controls to normalize the roster split or close public signup access.
+                    </p>
+                  </div>
                   <Button
                     className="w-full border-amber-300 bg-amber-400 text-ink-950 hover:bg-amber-300 focus-visible:ring-amber-200"
                     onClick={() => void handleResetCosts()}
@@ -182,9 +195,6 @@ export default function AdminSessionDetail() {
                     {resettingCosts ? 'Resetting...' : 'Reset all to even split'}
                   </Button>
                 </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-1">
                 <Button
                   className="w-full border-white/20 bg-white/10 text-white hover:bg-white/20 focus-visible:ring-white/30"
                   onClick={() => void handleToggleActive()}
