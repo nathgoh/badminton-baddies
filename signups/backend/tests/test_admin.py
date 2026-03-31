@@ -144,6 +144,28 @@ def test_promote_from_waitlist(client, storage):
     }
 
 
+def test_promote_from_waitlist_rejects_non_waitlist_signup(client):
+    session = _setup(client)
+    signup = _signup(client, session["access_token"], "a@t.com", "Alice").json()
+
+    response = client.post(f"/api/admin/signups/{signup['id']}/promote")
+
+    assert response.status_code == 400
+    assert "waitlisted" in response.json()["detail"].lower()
+
+
+def test_promote_from_waitlist_rejects_cancelled_signup(client):
+    session = _setup(client)
+    signup = _signup(client, session["access_token"], "a@t.com", "Alice").json()
+    cancel_response = client.delete(f"/api/admin/signups/{signup['id']}")
+    assert cancel_response.status_code == 200
+
+    response = client.post(f"/api/admin/signups/{signup['id']}/promote")
+
+    assert response.status_code == 400
+    assert "waitlisted" in response.json()["detail"].lower()
+
+
 def test_admin_cancel_signup(client, storage):
     session = _setup(client)
     token = session["access_token"]

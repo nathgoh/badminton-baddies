@@ -201,6 +201,13 @@ def mark_paid(
 @router.post("/signups/{signup_id}/promote", response_model=Signup)
 def promote_from_waitlist(signup_id: str, storage: StorageAdapter = Depends(get_storage)) -> Signup:
     try:
+        signup = _get_signup_by_id(storage, signup_id)
+        if signup.status != SignupStatus.waitlist:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only waitlisted signups can be promoted",
+            )
+
         promoted = storage.update_signup(signup_id, SignupUpdate(status=SignupStatus.confirmed))
         _recalculate_session_costs(promoted.session_id, storage)
         return next(item for item in storage.get_signups(promoted.session_id) if item.id == signup_id)
