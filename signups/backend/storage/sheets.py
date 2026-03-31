@@ -156,7 +156,7 @@ class SheetsAdapter(StorageAdapter):
     def create_session(self, data: SessionCreate) -> Session:
         session = Session(
             id=uuid.uuid4().hex[:8],
-            access_token=secrets.token_urlsafe(8),
+            access_token=secrets.token_urlsafe(32),
             created_at=datetime.now(timezone.utc),
             **data.model_dump(),
         )

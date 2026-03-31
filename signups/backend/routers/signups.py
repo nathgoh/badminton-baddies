@@ -1,10 +1,11 @@
 from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 try:
+    from ..main import limiter
     from ..dependencies import get_storage
     from ..models import (
         CancelLookupResponse,
@@ -20,6 +21,7 @@ try:
     from ..storage.adapter import StorageAdapter
     from .admin import _recalculate_session_costs, _validate_projected_confirmed_costs
 except ImportError:
+    from main import limiter
     from dependencies import get_storage
     from models import (
         CancelLookupResponse,
@@ -79,7 +81,8 @@ def _next_waitlisted_signup(session_id: str, storage: StorageAdapter) -> Optiona
 
 
 @router.get("/public/{token}", response_model=PublicSessionResponse)
-def get_public_session(token: str, storage: StorageAdapter = Depends(get_storage)) -> PublicSessionResponse:
+@limiter.limit("30/minute")
+def get_public_session(request: Request, token: str, storage: StorageAdapter = Depends(get_storage)) -> PublicSessionResponse:
     session = _get_session_or_404(token, storage)
     courts = storage.get_courts(session.id)
     signups = storage.get_signups(session.id)
@@ -96,7 +99,9 @@ def get_public_session(token: str, storage: StorageAdapter = Depends(get_storage
 
 
 @router.post("/public/{token}/signup", response_model=Signup, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
 def create_signup(
+    request: Request,
     token: str,
     body: SignupRequest,
     storage: StorageAdapter = Depends(get_storage),
@@ -139,8 +144,9 @@ def create_signup(
 
 
 @router.get("/public/{token}/player-lookup", response_model=PlayerLookupResponse)
+@limiter.limit("30/minute")
 def player_lookup(
-    token: str, email: str, storage: StorageAdapter = Depends(get_storage)
+    request: Request, token: str, email: str, storage: StorageAdapter = Depends(get_storage)
 ) -> PlayerLookupResponse:
     _get_session_or_404(token, storage)
     player = storage.get_player(email)
@@ -150,8 +156,9 @@ def player_lookup(
 
 
 @router.get("/public/{token}/cancel-lookup", response_model=CancelLookupResponse)
+@limiter.limit("30/minute")
 def cancel_lookup(
-    token: str, email: str, storage: StorageAdapter = Depends(get_storage)
+    request: Request, token: str, email: str, storage: StorageAdapter = Depends(get_storage)
 ) -> CancelLookupResponse:
     session = _get_session_or_404(token, storage)
     signup = next(
@@ -175,8 +182,9 @@ def cancel_lookup(
 
 
 @router.post("/public/{token}/cancel", response_model=Signup)
+@limiter.limit("30/minute")
 def cancel_signup(
-    token: str, body: CancelRequest, storage: StorageAdapter = Depends(get_storage)
+    request: Request, token: str, body: CancelRequest, storage: StorageAdapter = Depends(get_storage)
 ) -> Signup:
     session = _get_session_or_404(token, storage)
     signup = next((item for item in storage.get_signups(session.id) if item.id == body.signup_id), None)

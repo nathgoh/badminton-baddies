@@ -1,4 +1,6 @@
-from fastapi import Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 try:
@@ -11,14 +13,24 @@ except ImportError:
     from storage.adapter import StorageAdapter
 
 
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def require_admin(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     storage: StorageAdapter = Depends(get_storage),
 ) -> str:
-    email = decode_jwt(credentials.credentials)
+    # Prefer httpOnly cookie; fall back to Bearer header for compatibility
+    token: Optional[str] = request.cookies.get("admin_token")
+    if not token and credentials:
+        token = credentials.credentials
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    email = decode_jwt(token)
     if not email:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

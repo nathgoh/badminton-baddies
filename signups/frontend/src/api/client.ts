@@ -9,20 +9,14 @@ import type {
   Signup,
 } from '../types'
 
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('admin_jwt')
-  return token ? { Authorization: `Bearer ${token}` } : {}
-}
-
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     ...init,
   })
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      localStorage.removeItem('admin_jwt')
-      localStorage.removeItem('admin_email')
       window.location.href = '/admin/login'
     }
     const body = await response.json().catch(() => ({}))
@@ -36,11 +30,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function loginWithGoogle(
   idToken: string,
-): Promise<{ access_token: string; email: string }> {
+): Promise<{ ok: boolean; email: string }> {
   return request('/auth/google', {
     method: 'POST',
     body: JSON.stringify({ id_token: idToken }),
   })
+}
+
+export async function logoutFromServer(): Promise<void> {
+  await fetch('/auth/logout', { method: 'POST', credentials: 'include' })
+}
+
+export async function verifyAuth(): Promise<{ email: string } | null> {
+  const response = await fetch('/auth/me', { credentials: 'include' })
+  if (!response.ok) return null
+  return response.json()
 }
 
 export async function getPublicSession(token: string): Promise<PublicSessionResponse> {
