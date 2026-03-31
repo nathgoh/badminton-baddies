@@ -146,7 +146,8 @@ def update_signup_amount(
             signup_id,
             SignupUpdate(amount_owed=body.amount_owed, amount_adjusted=body.amount_adjusted),
         )
-        _recalculate_session_costs(updated.session_id, storage)
+        if updated.status == SignupStatus.confirmed:
+            _recalculate_session_costs(updated.session_id, storage)
         return next(item for item in storage.get_signups(updated.session_id) if item.id == signup_id)
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signup not found") from exc

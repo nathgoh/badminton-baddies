@@ -280,6 +280,43 @@ def test_manual_amount_edit_recalculates_remaining_confirmed_players(client):
     assert signups["c@t.com"]["amount_owed"] == 12.0
 
 
+def test_manual_amount_edit_on_waitlist_does_not_recalculate_costs(client, monkeypatch):
+    from ..routers import admin as admin_router
+
+    session = _setup(client)
+    token = session["access_token"]
+    _signup(client, token, "a@t.com", "Alice")
+    _signup(client, token, "b@t.com", "Bob")
+    _signup(client, token, "c@t.com", "Carol")
+    _signup(client, token, "d@t.com", "Dan")
+    eve = _signup(client, token, "e@t.com", "Eve").json()
+
+    helper_calls = 0
+    original_recalculate_session_costs = admin_router._recalculate_session_costs
+
+    def counting_recalculate_session_costs(*args, **kwargs):
+        nonlocal helper_calls
+        helper_calls += 1
+        return original_recalculate_session_costs(*args, **kwargs)
+
+    monkeypatch.setattr(
+        admin_router,
+        "_recalculate_session_costs",
+        counting_recalculate_session_costs,
+        raising=False,
+    )
+
+    response = client.patch(
+        f"/api/admin/signups/{eve['id']}",
+        json={"amount_owed": 9.0, "amount_adjusted": True},
+    )
+
+    assert response.status_code == 200
+    assert helper_calls == 0
+    assert response.json()["status"] == "waitlist"
+    assert response.json()["amount_owed"] == 9.0
+
+
 def test_waitlist_cancel_does_not_recalculate_costs(client, storage):
     session = _setup(client)
     token = session["access_token"]
