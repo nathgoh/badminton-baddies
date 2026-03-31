@@ -68,7 +68,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
             return (
               <article
                 key={signup.id}
-                className={`rounded-[1.5rem] border p-4 transition duration-150 hover:scale-[1.01] hover:shadow-md ${
+                className={`rounded-[1.5rem] border p-4 transition duration-150 hover:brightness-95 ${
                   isPaid
                     ? 'border-emerald-200 bg-emerald-50'
                     : 'border-slate-200 bg-slate-50/70'
