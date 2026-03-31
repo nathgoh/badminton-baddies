@@ -7,4 +7,12 @@ describe('AdminPlayers structure hooks', () => {
     expect(AdminPlayersSource).toMatch(/data-testid\s*=\s*["']admin-player-card["']/)
     expect(AdminPlayersSource).toMatch(/data-testid\s*=\s*["']admin-player-edit["']/)
   })
+
+  it('preserves player editing workflow markers', () => {
+    expect(AdminPlayersSource).toContain('editingEmail')
+    expect(AdminPlayersSource).toContain('handleSave')
+    expect(AdminPlayersSource).toContain('updatePlayer')
+    expect(AdminPlayersSource).toContain('listPlayers')
+    expect(AdminPlayersSource).toContain("navigate('/admin')")
+  })
 })

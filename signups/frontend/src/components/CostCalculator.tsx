@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
 import { createCourt, deleteCourt, regenerateToken, updateCourt } from '../api/client'
+import Button from './ui/Button'
+import Card from './ui/Card'
 import { formatTime } from '../utils'
 import type { AdminSessionResponse } from '../types'
 
@@ -17,6 +19,9 @@ interface CourtEdit {
   max_players: string
   total_cost: string
 }
+
+const inputClassName =
+  'w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200'
 
 export default function CostCalculator({ data, onRefresh }: Props) {
   const [copying, setCopying] = useState(false)
@@ -94,83 +99,129 @@ export default function CostCalculator({ data, onRefresh }: Props) {
   }
 
   return (
-    <div className="admin-detail-tools">
-      <section className="admin-card admin-courts-card">
-        <div className="admin-card-label">Courts</div>
-        <div className="admin-court-list">
+    <div className="grid gap-4">
+      <Card className="space-y-5">
+        <div className="space-y-1">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">Courts</div>
+          <div className="text-2xl font-semibold text-ink-950">
+            {data.courts.length} court{data.courts.length === 1 ? '' : 's'} configured
+          </div>
+        </div>
+        <div className="admin-court-list space-y-3">
           {data.courts.map((court) =>
             editingCourtId === court.id && editValues ? (
-              <form key={court.id} className="admin-court-item admin-court-item-editing" onSubmit={handleSaveCourt}>
-                <div className="admin-court-item-header">
-                  <div className="admin-court-item-copy">
-                    <div className="admin-court-name">{court.name}</div>
-                    <div className="admin-court-meta">
-                      {formatTime(court.start_time)} - {formatTime(court.end_time)} · max {court.max_players} · ${court.total_cost}
+              <form
+                key={court.id}
+                className="admin-court-item admin-court-item-editing rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4"
+                onSubmit={handleSaveCourt}
+              >
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
+                      <div className="text-lg font-semibold text-ink-950">{court.name}</div>
+                      <div className="text-sm text-ink-700">
+                        {formatTime(court.start_time)} - {formatTime(court.end_time)} · max{' '}
+                        {court.max_players} · ${court.total_cost}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Button type="submit" variant="secondary">
+                        Save
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingCourtId(null)
+                          setEditValues(null)
+                        }}
+                      >
+                        Cancel
+                      </Button>
                     </div>
                   </div>
-                  <div className="admin-court-item-actions">
-                    <button type="submit" className="admin-secondary-button">
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-secondary-button"
-                      onClick={() => {
-                        setEditingCourtId(null)
-                        setEditValues(null)
-                      }}
-                    >
-                      Cancel
-                    </button>
+
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <label className="grid gap-2 text-sm font-medium text-ink-900">
+                      <span>Start time</span>
+                      <input
+                        className={inputClassName}
+                        required
+                        type="time"
+                        value={editValues.start_time}
+                        onChange={(e) =>
+                          setEditValues((v) => v && ({ ...v, start_time: e.target.value }))
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-2 text-sm font-medium text-ink-900">
+                      <span>End time</span>
+                      <input
+                        className={inputClassName}
+                        required
+                        type="time"
+                        value={editValues.end_time}
+                        onChange={(e) =>
+                          setEditValues((v) => v && ({ ...v, end_time: e.target.value }))
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-2 text-sm font-medium text-ink-900">
+                      <span>Max players</span>
+                      <input
+                        className={inputClassName}
+                        required
+                        type="number"
+                        min="1"
+                        placeholder="Max players"
+                        value={editValues.max_players}
+                        onChange={(e) =>
+                          setEditValues((v) => v && ({ ...v, max_players: e.target.value }))
+                        }
+                      />
+                    </label>
+                    <label className="grid gap-2 text-sm font-medium text-ink-900">
+                      <span>Total cost</span>
+                      <input
+                        className={inputClassName}
+                        required
+                        type="number"
+                        step="0.01"
+                        placeholder="Cost $"
+                        value={editValues.total_cost}
+                        onChange={(e) =>
+                          setEditValues((v) => v && ({ ...v, total_cost: e.target.value }))
+                        }
+                      />
+                    </label>
                   </div>
-                </div>
-                <div className="admin-court-edit-grid">
-                  <input
-                    required
-                    type="time"
-                    value={editValues.start_time}
-                    onChange={(e) => setEditValues((v) => v && ({ ...v, start_time: e.target.value }))}
-                  />
-                  <input
-                    required
-                    type="time"
-                    value={editValues.end_time}
-                    onChange={(e) => setEditValues((v) => v && ({ ...v, end_time: e.target.value }))}
-                  />
-                  <input
-                    required
-                    type="number"
-                    min="1"
-                    placeholder="Max players"
-                    value={editValues.max_players}
-                    onChange={(e) => setEditValues((v) => v && ({ ...v, max_players: e.target.value }))}
-                  />
-                  <input
-                    required
-                    type="number"
-                    step="0.01"
-                    placeholder="Cost $"
-                    value={editValues.total_cost}
-                    onChange={(e) => setEditValues((v) => v && ({ ...v, total_cost: e.target.value }))}
-                  />
                 </div>
               </form>
             ) : (
-              <article key={court.id} className="admin-court-item">
-                <div className="admin-court-item-header">
-                  <div className="admin-court-item-copy">
-                    <div className="admin-court-name">{court.name}</div>
-                    <div className="admin-court-meta">
-                      {formatTime(court.start_time)} - {formatTime(court.end_time)} · max {court.max_players} · ${court.total_cost}
+              <article
+                key={court.id}
+                className="admin-court-item rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="text-lg font-semibold text-ink-950">{court.name}</div>
+                    <div className="text-sm text-ink-700">
+                      {formatTime(court.start_time)} - {formatTime(court.end_time)} · max{' '}
+                      {court.max_players} · ${court.total_cost}
                     </div>
                   </div>
-                  <div className="admin-court-item-actions">
-                    <button type="button" className="admin-secondary-button" onClick={() => startEditCourt(court.id)}>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button type="button" variant="secondary" onClick={() => startEditCourt(court.id)}>
                       Edit
-                    </button>
-                    <button type="button" className="admin-danger-button" onClick={() => void handleDeleteCourt(court.id)}>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      onClick={() => void handleDeleteCourt(court.id)}
+                    >
                       Remove
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </article>
@@ -179,83 +230,118 @@ export default function CostCalculator({ data, onRefresh }: Props) {
         </div>
 
         {showAddCourt ? (
-          <form className="admin-court-item admin-court-item-add" onSubmit={handleAddCourt}>
-            <div className="admin-court-item-header">
-              <div className="admin-court-item-copy">
-                <div className="admin-court-name">Add court</div>
-                <div className="admin-court-meta">Create a new court entry for this session.</div>
+          <form
+            className="admin-court-item admin-court-item-add rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50/80 p-4"
+            onSubmit={handleAddCourt}
+          >
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <div className="text-lg font-semibold text-ink-950">Add court</div>
+                  <div className="text-sm text-ink-700">
+                    Create a new court entry for this session.
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button type="submit" disabled={addingCourt}>
+                    {addingCourt ? 'Adding...' : 'Add'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setShowAddCourt(false)
+                      setNewCourt(EMPTY_COURT)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
-              <div className="admin-court-item-actions">
-                <button type="submit" className="admin-primary-button" disabled={addingCourt}>
-                  {addingCourt ? 'Adding...' : 'Add'}
-                </button>
-                <button
-                  type="button"
-                  className="admin-secondary-button"
-                  onClick={() => {
-                    setShowAddCourt(false)
-                    setNewCourt(EMPTY_COURT)
-                  }}
-                >
-                  Cancel
-                </button>
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <label className="grid gap-2 text-sm font-medium text-ink-900">
+                  <span>Court name</span>
+                  <input
+                    className={inputClassName}
+                    required
+                    placeholder="Court name"
+                    value={newCourt.name}
+                    onChange={(e) => setNewCourt((c) => ({ ...c, name: e.target.value }))}
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-ink-900">
+                  <span>Start time</span>
+                  <input
+                    className={inputClassName}
+                    required
+                    type="time"
+                    value={newCourt.start_time}
+                    onChange={(e) => setNewCourt((c) => ({ ...c, start_time: e.target.value }))}
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-ink-900">
+                  <span>End time</span>
+                  <input
+                    className={inputClassName}
+                    required
+                    type="time"
+                    value={newCourt.end_time}
+                    onChange={(e) => setNewCourt((c) => ({ ...c, end_time: e.target.value }))}
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-ink-900">
+                  <span>Max players</span>
+                  <input
+                    className={inputClassName}
+                    required
+                    type="number"
+                    min="1"
+                    placeholder="Max players"
+                    value={newCourt.max_players}
+                    onChange={(e) => setNewCourt((c) => ({ ...c, max_players: e.target.value }))}
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-ink-900">
+                  <span>Total cost</span>
+                  <input
+                    className={inputClassName}
+                    required
+                    type="number"
+                    placeholder="Cost $"
+                    value={newCourt.total_cost}
+                    onChange={(e) => setNewCourt((c) => ({ ...c, total_cost: e.target.value }))}
+                  />
+                </label>
               </div>
-            </div>
-            <div className="admin-court-edit-grid admin-court-edit-grid-add">
-              <input
-                required
-                placeholder="Court name"
-                value={newCourt.name}
-                onChange={(e) => setNewCourt((c) => ({ ...c, name: e.target.value }))}
-              />
-              <input
-                required
-                type="time"
-                value={newCourt.start_time}
-                onChange={(e) => setNewCourt((c) => ({ ...c, start_time: e.target.value }))}
-              />
-              <input
-                required
-                type="time"
-                value={newCourt.end_time}
-                onChange={(e) => setNewCourt((c) => ({ ...c, end_time: e.target.value }))}
-              />
-              <input
-                required
-                type="number"
-                min="1"
-                placeholder="Max players"
-                value={newCourt.max_players}
-                onChange={(e) => setNewCourt((c) => ({ ...c, max_players: e.target.value }))}
-              />
-              <input
-                required
-                type="number"
-                placeholder="Cost $"
-                value={newCourt.total_cost}
-                onChange={(e) => setNewCourt((c) => ({ ...c, total_cost: e.target.value }))}
-              />
             </div>
           </form>
         ) : (
-          <button type="button" className="admin-secondary-button admin-court-add-trigger" onClick={() => setShowAddCourt(true)}>
+          <Button type="button" variant="secondary" onClick={() => setShowAddCourt(true)}>
             + Add court
-          </button>
+          </Button>
         )}
-      </section>
+      </Card>
 
-      <section className="admin-card admin-signup-link-card">
-        <div className="admin-card-label">Signup link</div>
-        <div className="admin-signup-link-value">{publicUrl}</div>
-        <div className="admin-signup-link-actions">
-          <button type="button" className="admin-secondary-button" onClick={handleCopy}>
-            {copying ? 'Copied!' : 'Copy'}
-          </button>
-          <button type="button" className="admin-danger-button" onClick={handleRegenerate}>
-            Regenerate
-          </button>
+      <Card className="admin-signup-link-card space-y-5">
+        <div className="space-y-1">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">
+            Signup link
+          </div>
+          <div className="text-2xl font-semibold text-ink-950">Public session access</div>
         </div>
-      </section>
+        <div className="overflow-hidden rounded-[1.5rem] border border-sand-100 bg-sand-50/80 px-4 py-3 text-sm text-ink-700">
+          <div className="break-all font-medium text-ink-950">{publicUrl}</div>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button type="button" variant="secondary" onClick={handleCopy}>
+            {copying ? 'Copied!' : 'Copy'}
+          </Button>
+          <Button type="button" variant="danger" onClick={handleRegenerate}>
+            Regenerate
+          </Button>
+        </div>
+      </Card>
     </div>
   )
 }

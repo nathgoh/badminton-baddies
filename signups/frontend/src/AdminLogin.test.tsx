@@ -6,4 +6,11 @@ describe('AdminLogin structure hooks', () => {
     expect(AdminLoginSource).toMatch(/data-testid\s*=\s*["']admin-login-shell["']/)
     expect(AdminLoginSource).toMatch(/data-testid\s*=\s*["']admin-login-card["']/)
   })
+
+  it('preserves the Google auth workflow markers', () => {
+    expect(AdminLoginSource).toContain('GoogleLogin')
+    expect(AdminLoginSource).toContain('loginWithIdToken')
+    expect(AdminLoginSource).toContain("navigate('/admin')")
+    expect(AdminLoginSource).toContain('Google login failed')
+  })
 })

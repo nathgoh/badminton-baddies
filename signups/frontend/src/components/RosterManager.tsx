@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
 import { adminCancelSignup, markSignupPaid, promoteFromWaitlist, updateSignupAmount } from '../api/client'
+import Button from './ui/Button'
+import Card from './ui/Card'
 import type { Signup } from '../types'
 
 interface Props {
@@ -44,93 +46,134 @@ export default function RosterManager({ signups, onRefresh }: Props) {
   }
 
   return (
-    <div className="admin-detail-tools">
-      <section className="admin-card admin-roster-card">
-        <div className="admin-card-label">Roster</div>
-        <div className="admin-roster-list">
+    <div className="grid gap-4">
+      <Card className="space-y-5">
+        <div className="space-y-1">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">Roster</div>
+          <div className="text-2xl font-semibold text-ink-950">
+            {confirmed.length} confirmed player{confirmed.length === 1 ? '' : 's'}
+          </div>
+        </div>
+        <div className="admin-roster-list space-y-3">
           {confirmed.map((signup) => {
             const isEditing = editingId === signup.id
 
             return (
-              <article key={signup.id} className="admin-roster-item">
-                <div className="admin-roster-item-header">
-                  <div className="admin-roster-item-copy">
-                    <div className="admin-roster-name">{signup.name}</div>
-                    <div className="admin-roster-email">{signup.email}</div>
+              <article
+                key={signup.id}
+                className="admin-roster-item rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <div className="text-lg font-semibold text-ink-950">{signup.name}</div>
+                    <div className="break-all text-sm text-ink-700">{signup.email}</div>
                   </div>
 
-                  <div className="admin-roster-item-amount">
+                  <div className="flex items-center sm:justify-end">
                     {isEditing ? (
                       <input
                         type="number"
                         step="0.01"
                         value={editAmount}
                         onChange={(event) => setEditAmount(event.target.value)}
-                        className="admin-roster-amount-input"
+                        className="w-full rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 sm:max-w-[140px]"
                         autoFocus
                       />
                     ) : (
-                      <span className={`admin-roster-amount-bubble${signup.amount_adjusted ? ' is-adjusted' : ''}`}>
+                      <span
+                        className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                          signup.amount_adjusted
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
                         {signup.amount_owed != null ? `$${signup.amount_owed.toFixed(2)}` : '—'}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="admin-roster-actions">
-                  <button
+                <div className="admin-roster-actions flex flex-col gap-3 pt-1 sm:flex-row">
+                  <Button
                     type="button"
-                    className="admin-roster-payment-toggle"
+                    className={`admin-roster-payment-toggle ${
+                      signup.paid
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        : ''
+                    }`}
                     onClick={() => void handleTogglePaid(signup.id, signup.paid)}
+                    variant="secondary"
                   >
                     {signup.paid ? 'Paid' : 'Unpaid'}
-                  </button>
+                  </Button>
 
                   {isEditing ? (
-                    <button type="button" className="admin-secondary-button" onClick={() => void handleSaveAmount(signup.id)}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => void handleSaveAmount(signup.id)}
+                    >
                       Save
-                    </button>
+                    </Button>
                   ) : (
-                    <button type="button" className="admin-secondary-button" onClick={() => startEditingAmount(signup)}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => startEditingAmount(signup)}
+                    >
                       Edit
-                    </button>
+                    </Button>
                   )}
 
-                  <button type="button" className="admin-danger-button" onClick={() => void handleCancel(signup.id)}>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={() => void handleCancel(signup.id)}
+                  >
                     Cancel signup
-                  </button>
+                  </Button>
                 </div>
               </article>
             )
           })}
         </div>
-      </section>
+      </Card>
 
       {waitlisted.length > 0 ? (
-        <section className="admin-card admin-roster-card admin-roster-waitlist-card">
-          <div className="admin-card-label">Waitlist</div>
-          <div className="admin-waitlist-list">
+        <Card className="space-y-5 border-amber-200 bg-amber-50/40">
+          <div className="space-y-1">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+              Waitlist
+            </div>
+            <div className="text-2xl font-semibold text-ink-950">
+              {waitlisted.length} waiting player{waitlisted.length === 1 ? '' : 's'}
+            </div>
+          </div>
+          <div className="admin-waitlist-list space-y-3">
             {waitlisted.map((signup) => (
-              <article key={signup.id} className="admin-waitlist-item">
-                <div className="admin-roster-item-header">
-                  <div className="admin-roster-item-copy">
-                    <div className="admin-roster-name">{signup.name}</div>
-                    <div className="admin-roster-email">{signup.email}</div>
+              <article
+                key={signup.id}
+                className="rounded-[1.5rem] border border-amber-200 bg-white/80 p-4"
+              >
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <div className="text-lg font-semibold text-ink-950">{signup.name}</div>
+                    <div className="break-all text-sm text-ink-700">{signup.email}</div>
                   </div>
-                </div>
 
-                <div className="admin-waitlist-actions">
-                  <button type="button" className="admin-primary-button" onClick={() => void handlePromote(signup.id)}>
-                    Promote
-                  </button>
-                  <button type="button" className="admin-danger-button" onClick={() => void handleCancel(signup.id)}>
-                    Cancel
-                  </button>
+                  <div className="admin-waitlist-actions flex flex-col gap-3 sm:flex-row">
+                    <Button type="button" onClick={() => void handlePromote(signup.id)}>
+                      Promote
+                    </Button>
+                    <Button type="button" variant="danger" onClick={() => void handleCancel(signup.id)}>
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
               </article>
             ))}
           </div>
-        </section>
+        </Card>
       ) : null}
     </div>
   )

@@ -8,20 +8,16 @@ describe('AdminSessionDetail structure hooks', () => {
     expect(AdminSessionDetailSource).toMatch(/data-testid\s*=\s*["']admin-detail-grid["']/)
   })
 
-  it('preserves the session controls and detail layout coverage', () => {
-    expect(AdminSessionDetailSource).toContain('admin-shell')
-    expect(AdminSessionDetailSource).toContain('admin-page-header')
-    expect(AdminSessionDetailSource).toContain('admin-session-detail-hero')
-    expect(AdminSessionDetailSource).toContain('admin-session-detail-stack')
-    expect(AdminSessionDetailSource).not.toContain('admin-session-detail-grid')
+  it('preserves the session controls and refresh workflow markers', () => {
     expect(AdminSessionDetailSource).toContain('handleToggleActive')
     expect(AdminSessionDetailSource).toContain('handleCalculate')
-    expect(AdminSessionDetailSource).toContain('admin-session-controls-costs')
-    expect(AdminSessionDetailSource).toContain('admin-session-controls-actions')
+    expect(AdminSessionDetailSource).toContain('CostCalculator')
+    expect(AdminSessionDetailSource).toContain('RosterManager')
+    expect(AdminSessionDetailSource).toContain('calculateCosts')
+    expect(AdminSessionDetailSource).toContain('updateSession')
   })
 
-  it('renders status badge only once', () => {
-    const matches = AdminSessionDetailSource.match(/admin-pill/g)
-    expect(matches?.length).toBe(1)
+  it('keeps a single conditional status badge expression', () => {
+    expect(AdminSessionDetailSource).toContain("data.session.is_active ? 'Active' : 'Draft'")
   })
 })

@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 
 import CostCalculator from '../components/CostCalculator'
 import RosterManager from '../components/RosterManager'
+import Button from '../components/ui/Button'
+import Card from '../components/ui/Card'
 import { calculateCosts, getAdminSession, updateSession } from '../api/client'
 import { formatDisplayDate } from '../utils'
 import type { AdminSessionResponse } from '../types'
@@ -54,88 +56,158 @@ export default function AdminSessionDetail() {
 
   if (!data) {
     return (
-      <div className="admin-shell admin-session-detail-page">
-        <div className="admin-card admin-session-detail-loading">Loading...</div>
+      <div
+        data-testid="admin-detail-shell"
+        className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
+      >
+        <Card className="mx-auto mt-16 max-w-xl text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-ink-700">
+            Session detail
+          </p>
+          <p className="mt-3 text-xl font-semibold text-ink-950">Loading...</p>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="admin-shell admin-session-detail-page">
-      <section className="admin-page-header">
-        <Link className="admin-back-link" to="/admin">
-          ← Back to sessions
-        </Link>
-        <div className="admin-card-label">Session detail</div>
-        <h1 className="admin-card-title">{data.session.name}</h1>
-        <p className="admin-session-detail-summary">
-          {formatDisplayDate(data.session.date)} · {data.confirmed_count} confirmed · {data.waitlist_count}{' '}
-          waitlisted
-        </p>
-      </section>
-
-      <div className="admin-session-detail-stack">
-        <section className="admin-card admin-session-detail-hero">
-          <div className="admin-session-detail-hero-top">
-            <div>
-              <div className="admin-card-label">Overview</div>
-              <h2 className="admin-session-detail-hero-title">Session controls</h2>
-            </div>
-            <span className={`admin-pill${data.session.is_active ? ' is-active' : ' is-draft'}`}>
-              {data.session.is_active ? 'Active' : 'Draft'}
-            </span>
-          </div>
-
-          <div className="admin-session-detail-meta">
-            <div className="admin-session-detail-meta-item">
-              <span className="admin-meta-label">Date</span>
-              <strong>{formatDisplayDate(data.session.date)}</strong>
-            </div>
-            <div className="admin-session-detail-meta-item">
-              <span className="admin-meta-label">Capacity</span>
-              <strong>{data.total_capacity} spots</strong>
-            </div>
-            <div className="admin-session-detail-meta-item">
-              <span className="admin-meta-label">Confirmed</span>
-              <strong>{data.confirmed_count}</strong>
-            </div>
-            <div className="admin-session-detail-meta-item">
-              <span className="admin-meta-label">Waitlist</span>
-              <strong>{data.waitlist_count}</strong>
-            </div>
-            <div className="admin-session-detail-meta-item">
-              <span className="admin-meta-label">Cancel window</span>
-              <strong>{data.session.cancel_window_hours} hours</strong>
-            </div>
-          </div>
-
-          <div className="admin-session-controls-costs">
-            <div className="admin-card-label">Cost split</div>
-            <div className="admin-session-controls-cost-grid">
-              <div className="admin-session-controls-cost-row">
-                <span>Total court cost</span>
-                <strong>${data.total_cost.toFixed(2)}</strong>
-              </div>
-              {result ? (
-                <div className="admin-session-controls-cost-row admin-session-controls-cost-row-emphasis">
-                  <span>Base per player</span>
-                  <strong>${result.base_amount.toFixed(2)}</strong>
+    <div
+      data-testid="admin-detail-shell"
+      className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
+    >
+      <div className="space-y-5">
+        <section
+          data-testid="admin-detail-hero"
+          className="relative overflow-hidden rounded-[2rem] bg-ink-950 px-5 py-6 text-white shadow-soft sm:px-8 sm:py-8"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.18),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(245,158,11,0.18),_transparent_30%)]" />
+          <div className="relative space-y-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl space-y-3">
+                <Link
+                  className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/15"
+                  to="/admin"
+                >
+                  <span aria-hidden="true">←</span>
+                  Back to sessions
+                </Link>
+                <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sand-50">
+                  Session detail
                 </div>
-              ) : null}
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                    {data.session.name}
+                  </h1>
+                  <p className="text-sm text-slate-200 sm:text-base">
+                    {formatDisplayDate(data.session.date)} · {data.confirmed_count} confirmed ·{' '}
+                    {data.waitlist_count} waitlisted
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-[1.5rem] border border-white/15 bg-white/10 px-4 py-4 backdrop-blur-sm sm:min-w-[220px]">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                  Session status
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <span className="text-sm text-slate-200">Access to the public signup</span>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                      data.session.is_active
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-white/15 text-white'
+                    }`}
+                  >
+                    {data.session.is_active ? 'Active' : 'Draft'}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="admin-session-controls-actions">
-              <button type="button" className="admin-session-toggle-button" onClick={() => void handleToggleActive()} disabled={toggling}>
-                {toggling ? 'Saving...' : data.session.is_active ? 'Close session' : 'Open session'}
-              </button>
-              <button type="button" className="admin-session-calculate-button" onClick={() => void handleCalculate()} disabled={calculating}>
-                {calculating ? 'Calculating...' : 'Calculate & assign costs'}
-              </button>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                  Date
+                </div>
+                <div className="mt-2 text-lg font-semibold">{formatDisplayDate(data.session.date)}</div>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                  Capacity
+                </div>
+                <div className="mt-2 text-lg font-semibold">{data.total_capacity} spots</div>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                  Confirmed
+                </div>
+                <div className="mt-2 text-lg font-semibold">{data.confirmed_count}</div>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                  Waitlist
+                </div>
+                <div className="mt-2 text-lg font-semibold">{data.waitlist_count}</div>
+              </div>
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                  Cancel window
+                </div>
+                <div className="mt-2 text-lg font-semibold">
+                  {data.session.cancel_window_hours} hours
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-end">
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
+                  Cost split
+                </div>
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-white/90 px-4 py-3 text-sm text-ink-700">
+                    <span>Total court cost</span>
+                    <strong className="text-base text-ink-950">${data.total_cost.toFixed(2)}</strong>
+                  </div>
+                  {result ? (
+                    <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      <span>Base per player</span>
+                      <strong className="text-base">${result.base_amount.toFixed(2)}</strong>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button
+                  className="w-full border-white/20 bg-white/10 text-white hover:bg-white/20 focus-visible:ring-white/30"
+                  onClick={() => void handleToggleActive()}
+                  disabled={toggling}
+                  type="button"
+                  variant="secondary"
+                >
+                  {toggling ? 'Saving...' : data.session.is_active ? 'Close session' : 'Open session'}
+                </Button>
+                <Button
+                  className="w-full border-amber-300 bg-amber-400 text-ink-950 hover:bg-amber-300 focus-visible:ring-amber-200"
+                  onClick={() => void handleCalculate()}
+                  disabled={calculating}
+                  type="button"
+                >
+                  {calculating ? 'Calculating...' : 'Calculate & assign costs'}
+                </Button>
+              </div>
             </div>
           </div>
         </section>
 
-        <CostCalculator data={data} onRefresh={() => void load()} />
-        <RosterManager signups={data.signups} onRefresh={() => void load()} />
+        <div
+          data-testid="admin-detail-grid"
+          className="grid gap-4 xl:grid-cols-[minmax(0,0.98fr)_minmax(0,1.02fr)]"
+        >
+          <CostCalculator data={data} onRefresh={() => void load()} />
+          <RosterManager signups={data.signups} onRefresh={() => void load()} />
+        </div>
       </div>
     </div>
   )
