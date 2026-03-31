@@ -54,14 +54,15 @@ export default function RosterManager({ signups, onRefresh }: Props) {
             {confirmed.length} confirmed player{confirmed.length === 1 ? '' : 's'}
           </div>
         </div>
-        <div className="admin-roster-list space-y-3">
+        <div className="space-y-3" data-testid="roster-list">
           {confirmed.map((signup) => {
             const isEditing = editingId === signup.id
 
             return (
               <article
                 key={signup.id}
-                className="admin-roster-item rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4"
+                className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4"
+                data-testid="roster-item"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-1">
@@ -93,14 +94,15 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                   </div>
                 </div>
 
-                <div className="admin-roster-actions flex flex-col gap-3 pt-1 sm:flex-row">
+                <div className="flex flex-col gap-3 pt-1 sm:flex-row">
                   <Button
                     type="button"
-                    className={`admin-roster-payment-toggle ${
+                    className={`${
                       signup.paid
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                         : ''
                     }`}
+                    data-testid="roster-payment-toggle"
                     onClick={() => void handleTogglePaid(signup.id, signup.paid)}
                     variant="secondary"
                   >
@@ -149,7 +151,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
               {waitlisted.length} waiting player{waitlisted.length === 1 ? '' : 's'}
             </div>
           </div>
-          <div className="admin-waitlist-list space-y-3">
+          <div className="space-y-3">
             {waitlisted.map((signup) => (
               <article
                 key={signup.id}
@@ -161,7 +163,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                     <div className="break-all text-sm text-ink-700">{signup.email}</div>
                   </div>
 
-                  <div className="admin-waitlist-actions flex flex-col gap-3 sm:flex-row">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <Button type="button" onClick={() => void handlePromote(signup.id)}>
                       Promote
                     </Button>

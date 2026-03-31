@@ -62,7 +62,6 @@ describe('CourtCards', () => {
     expect(markup).toContain('>Full<')
     expect(markup).toContain('Cancellation closes in 2d 6h')
     expect(markup).not.toContain('Full · 2 waitlist')
-    expect(markup).not.toContain('public-signup-summary-value')
 
     vi.useRealTimers()
   })

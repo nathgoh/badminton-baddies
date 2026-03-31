@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "./styles.css";
 
 @theme {
   --font-sans: "Inter", "Avenir Next", "Segoe UI", sans-serif;

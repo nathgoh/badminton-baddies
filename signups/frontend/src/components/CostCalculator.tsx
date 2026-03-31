@@ -107,12 +107,13 @@ export default function CostCalculator({ data, onRefresh }: Props) {
             {data.courts.length} court{data.courts.length === 1 ? '' : 's'} configured
           </div>
         </div>
-        <div className="admin-court-list space-y-3">
+        <div className="space-y-3" data-testid="court-list">
           {data.courts.map((court) =>
             editingCourtId === court.id && editValues ? (
               <form
                 key={court.id}
-                className="admin-court-item admin-court-item-editing rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4"
+                className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4"
+                data-testid="court-item"
                 onSubmit={handleSaveCourt}
               >
                 <div className="space-y-4">
@@ -201,7 +202,8 @@ export default function CostCalculator({ data, onRefresh }: Props) {
             ) : (
               <article
                 key={court.id}
-                className="admin-court-item rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4"
+                className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4"
+                data-testid="court-item"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-1">
@@ -231,7 +233,8 @@ export default function CostCalculator({ data, onRefresh }: Props) {
 
         {showAddCourt ? (
           <form
-            className="admin-court-item admin-court-item-add rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50/80 p-4"
+            className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50/80 p-4"
+            data-testid="court-item"
             onSubmit={handleAddCourt}
           >
             <div className="space-y-4">
@@ -323,7 +326,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
         )}
       </Card>
 
-      <Card className="admin-signup-link-card space-y-5">
+      <Card className="space-y-5" data-testid="signup-link-card">
         <div className="space-y-1">
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">
             Signup link
