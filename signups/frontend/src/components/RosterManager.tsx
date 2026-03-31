@@ -19,6 +19,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
   const [optimisticPaid, setOptimisticPaid] = useState<Record<string, boolean>>({})
   const [dropdownId, setDropdownId] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const inputMouseDownRef = useRef(false)
 
   useEffect(() => {
     if (!dropdownId) return
@@ -129,7 +130,10 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                   className="w-full text-left"
                   data-testid="roster-payment-toggle"
                   onMouseDown={(e) => { if (isEditing && !(e.target instanceof HTMLInputElement)) e.preventDefault() }}
-                  onClick={() => void handleTogglePaid(signup.id, isPaid)}
+                  onClick={() => {
+                    if (inputMouseDownRef.current) { inputMouseDownRef.current = false; return }
+                    void handleTogglePaid(signup.id, isPaid)
+                  }}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 space-y-1">
@@ -158,6 +162,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                           className="w-full rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 sm:max-w-[140px]"
                           autoFocus
                           onFocus={(e) => e.target.select()}
+                          onMouseDown={() => { inputMouseDownRef.current = true }}
                           onClick={(e) => e.stopPropagation()}
                           onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); void handleSaveAmount(signup.id) } }}
                           onBlur={() => setTimeout(() => setEditingId(null), 150)}
