@@ -98,7 +98,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                       </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center">
+                    <div className="flex shrink-0 items-center gap-2">
                       {isEditing ? (
                         <input
                           type="number"
@@ -127,32 +127,31 @@ export default function RosterManager({ signups, onRefresh }: Props) {
                           {signup.amount_owed != null ? `$${signup.amount_owed.toFixed(2)}` : '—'}
                         </span>
                       )}
+                      <button
+                        type="button"
+                        aria-label="Cancel signup"
+                        className="rounded-full p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        onClick={(e) => { e.stopPropagation(); void handleCancel(signup.id) }}
+                      >
+                        ⚙
+                      </button>
                     </div>
                   </div>
                 </button>
 
-                <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                  {isEditing ? (
-                    <div className="flex gap-3 sm:order-last">
-                      <Button type="button" onClick={() => void handleSaveAmount(signup.id)}>
-                        Save
-                      </Button>
-                      <Button type="button" variant="secondary" onClick={() => setEditAmount(originalAmount)}>
-                        Reset
-                      </Button>
-                      <Button type="button" variant="secondary" onClick={() => setEditingId(null)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={() => void handleCancel(signup.id)}
-                  >
-                    Cancel signup
-                  </Button>
-                </div>
+                {isEditing ? (
+                  <div className="flex gap-3 pt-3">
+                    <Button type="button" onClick={() => void handleSaveAmount(signup.id)}>
+                      Save
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => setEditAmount(originalAmount)}>
+                      Reset
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                ) : null}
               </article>
             )
           })}
