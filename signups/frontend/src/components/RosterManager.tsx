@@ -128,7 +128,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                   type="button"
                   className="w-full text-left"
                   data-testid="roster-payment-toggle"
-                  onMouseDown={(e) => { if (isEditing) e.preventDefault() }}
+                  onMouseDown={(e) => { if (isEditing && !(e.target instanceof HTMLInputElement)) e.preventDefault() }}
                   onClick={() => void handleTogglePaid(signup.id, isPaid)}
                 >
                   <div className="flex items-center justify-between gap-3">
