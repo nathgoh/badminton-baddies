@@ -38,18 +38,19 @@ export default function AdminPlayers() {
       className="mx-auto min-h-screen max-w-6xl px-4 py-6 sm:px-6 lg:px-8"
     >
       <div className="space-y-5">
+        <button
+          className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-ink-900 transition hover:bg-slate-50"
+          onClick={() => navigate('/admin')}
+          type="button"
+        >
+          <span aria-hidden="true">←</span>
+          Back to sessions
+        </button>
+
         <section className="relative overflow-hidden rounded-[2rem] bg-ink-950 px-5 py-6 text-white shadow-soft sm:px-8 sm:py-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.18),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(245,158,11,0.2),_transparent_30%)]" />
           <div className="relative flex items-start justify-between gap-5">
             <div className="min-w-0 space-y-3">
-              <button
-                className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/15"
-                onClick={() => navigate('/admin')}
-                type="button"
-              >
-                <span aria-hidden="true">←</span>
-                Back to sessions
-              </button>
               <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sand-50">
                 Player database
               </div>
