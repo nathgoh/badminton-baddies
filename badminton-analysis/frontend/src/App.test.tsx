@@ -110,6 +110,51 @@ const completedReport = {
         },
       ],
     },
+    shuttle: {
+      summary: "Gaussian-smoothed shuttle occupancy leaned most heavily toward the front centre.",
+      uncertainty_note:
+        "Shuttle positions are inferred from shot context and tracked-player movement.",
+      samples: [{ timestamp_seconds: 12, x: 0.51, y: 0.24, confidence: 0.62, source: "inferred" }],
+      pressure_windows: [
+        {
+          label: "Forecourt pressure",
+          start_timestamp: "00:10",
+          end_timestamp: "00:18",
+          summary: "Repeated forecourt interceptions kept pressure on the opponent.",
+        },
+      ],
+      heatmap: [
+        { zone: "front-left", weight: 0.12 },
+        { zone: "front-centre", weight: 0.34 },
+        { zone: "mid-centre", weight: 0.21 },
+      ],
+    },
+  },
+  llm_provider: "gemini",
+  llm_model: "gemini-3-flash-preview",
+  generation_mode: "ai",
+  analysis_evidence: {
+    movement_summary: "Tracked distance 54.2m with recovery score 74.",
+    mechanics_summary: "Recovery shape degrades after deep forehand movements.",
+    shot_selection_summary: "Shot decisions are strongest when the feet arrive early.",
+    shuttle: {
+      summary: "Birdie pressure stayed front-court heavy.",
+      uncertainty_note: "Shuttle path was inferred from sampled events.",
+      samples: [{ timestamp_seconds: 12, x: 0.51, y: 0.24, confidence: 0.62, source: "inferred" }],
+      pressure_windows: [
+        {
+          label: "Forecourt pressure",
+          start_timestamp: "00:10",
+          end_timestamp: "00:18",
+          summary: "Repeated forecourt interceptions kept pressure on the opponent.",
+        },
+      ],
+      heatmap: [{ zone: "front-centre", weight: 0.34 }],
+    },
+  },
+  ai_rationale: {
+    summary: "The model weighted shuttle pressure and recovery timing most heavily.",
+    evidence_highlights: ["Forecourt pressure repeated in three shuttle windows."],
   },
   confidence_annotations: [
     {
@@ -336,14 +381,22 @@ test("renders the expanded coach and analytics report sections from the revised 
   expect(screen.getByText(/footwork notes/i)).toBeInTheDocument();
   expect(screen.getByText(/positioning notes/i)).toBeInTheDocument();
   expect(screen.getByText(/confidence notes/i)).toBeInTheDocument();
+  expect(screen.getAllByText(/gemini-3-flash-preview/i).length).toBeGreaterThan(0);
+  expect(
+    screen.getByText(/the model weighted shuttle pressure and recovery timing most heavily/i),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/forecourt pressure repeated in three shuttle windows/i)).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("tab", { name: /analytics view/i }));
 
   expect(screen.getByText(/mechanics/i)).toBeInTheDocument();
   expect(screen.getByText(/burst count/i)).toBeInTheDocument();
-  expect(screen.getByText(/heatmap/i)).toBeInTheDocument();
-  expect(screen.getByText(/front-left/i)).toBeInTheDocument();
-  expect(screen.getByText(/evidence/i)).toBeInTheDocument();
+  expect(screen.getByText(/court heatmap/i)).toBeInTheDocument();
+  expect(screen.getByText(/shuttle heatmap/i)).toBeInTheDocument();
+  expect(screen.getAllByText(/front left/i).length).toBeGreaterThan(0);
+  expect(screen.getByText(/shuttle evidence/i)).toBeInTheDocument();
+  expect(screen.getByText(/birdie pressure stayed front-court heavy/i)).toBeInTheDocument();
+  expect(screen.getByText(/shuttle path was inferred from sampled events/i)).toBeInTheDocument();
 });
 
 test("analyze another video button resets to the analyze screen", async () => {

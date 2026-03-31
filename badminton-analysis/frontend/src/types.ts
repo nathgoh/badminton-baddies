@@ -23,11 +23,20 @@ export interface CourtModel {
   adjustment_hint: string;
 }
 
+export interface DetectionBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface PlayerCandidate {
   player_id: string;
   label: string;
   side: "near" | "far";
   focus_hint: string;
+  detection_id?: string | null;
+  bounding_box?: DetectionBox | null;
 }
 
 export interface AnalysisCreatePayload {
@@ -126,17 +135,53 @@ export interface ShotSelectionMetrics {
   events: ShotSelectionEvent[];
 }
 
+export interface ShuttleSample {
+  timestamp_seconds: number;
+  x: number;
+  y: number;
+  confidence: number;
+  source: "inferred" | "observed";
+}
+
+export interface PressureWindow {
+  label: string;
+  start_timestamp: string;
+  end_timestamp: string;
+  summary: string;
+}
+
+export interface ShuttleMetrics {
+  summary: string;
+  uncertainty_note: string;
+  samples: ShuttleSample[];
+  pressure_windows: PressureWindow[];
+  heatmap: HeatmapCell[];
+}
+
 export interface AnalyticsView {
   mechanics: MechanicsMetrics;
   movement: MovementMetrics;
   positioning: PositioningMetrics;
   shot_selection: ShotSelectionMetrics;
+  shuttle: ShuttleMetrics;
 }
 
 export interface ConfidenceAnnotation {
   field: string;
   confidence: number;
   reason: string;
+}
+
+export interface AIRationale {
+  summary: string;
+  evidence_highlights: string[];
+}
+
+export interface AnalysisEvidence {
+  shuttle: ShuttleMetrics;
+  movement_summary: string;
+  mechanics_summary: string;
+  shot_selection_summary: string;
 }
 
 export interface AnalysisReport {
@@ -146,5 +191,10 @@ export interface AnalysisReport {
   coach_view: CoachView;
   analytics_view: AnalyticsView;
   confidence_annotations: ConfidenceAnnotation[];
+  llm_provider: string | null;
+  llm_model: string | null;
+  generation_mode: "ai" | "fallback";
+  analysis_evidence: AnalysisEvidence;
+  ai_rationale: AIRationale | null;
   generated_at: string;
 }

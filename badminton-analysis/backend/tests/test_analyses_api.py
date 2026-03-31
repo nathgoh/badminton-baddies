@@ -1,4 +1,3 @@
-import sys
 from base64 import b64decode
 from collections.abc import Generator
 from pathlib import Path
@@ -7,17 +6,54 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-import badminton_analysis_api.main as main_module
-from badminton_analysis_api.coach_feedback import PydanticAICoachFeedbackEngine
-from badminton_analysis_api.models import (
+import badminton_analysis_api.api.app as main_module
+from badminton_analysis_api.analyses.service import AnalysisService
+from badminton_analysis_api.analyses.store import AnalysisStore
+from badminton_analysis_api.coaching.engine import (
+    LLMCoachFeedbackEngine,
+    build_coach_feedback_engine_from_env,
+)
+from badminton_analysis_api.schemas import (
     CoachView,
     CourtModel,
     CourtPoint,
     MatchType,
     PlayerCandidate,
 )
-from badminton_analysis_api.service import AnalysisService
-from badminton_analysis_api.store import AnalysisStore
+
+
+def test_schema_package_exports_analysis_and_report_types() -> None:
+    from badminton_analysis_api.schemas import AnalysisReport, AnalysisStage, MatchType
+
+    assert AnalysisReport.__name__ == "AnalysisReport"
+    assert AnalysisStage.COMPLETED == "completed"
+    assert MatchType.MENS_SINGLES == "mens_singles"
+
+
+def test_new_package_paths_expose_engines_and_pipelines() -> None:
+    from badminton_analysis_api.coaching.engine import LLMCoachFeedbackEngine
+    from badminton_analysis_api.pipelines.cv.pipeline import CVPipeline
+    from badminton_analysis_api.pipelines.media.pipeline import MediaArtifactPipeline
+
+    assert LLMCoachFeedbackEngine.__name__ == "LLMCoachFeedbackEngine"
+    assert CVPipeline.__name__ == "CVPipeline"
+    assert MediaArtifactPipeline.__name__ == "MediaArtifactPipeline"
+
+
+def test_analysis_package_exports_service_and_store() -> None:
+    from badminton_analysis_api.analyses.progress import ANALYZING_PROGRESS_STEPS
+    from badminton_analysis_api.analyses.service import AnalysisService
+    from badminton_analysis_api.analyses.store import AnalysisStore
+
+    assert AnalysisService.__name__ == "AnalysisService"
+    assert AnalysisStore.__name__ == "AnalysisStore"
+    assert len(ANALYZING_PROGRESS_STEPS) > 0
+
+
+def test_api_app_module_exposes_fastapi_app() -> None:
+    import badminton_analysis_api.api.app as app_module
+
+    assert app_module.app.title == "Badminton Analysis API"
 
 
 class FailingCoachFeedbackEngine:
@@ -26,7 +62,7 @@ class FailingCoachFeedbackEngine:
 
 
 class FailingPipelineAnalysisService(AnalysisService):
-    def _build_analytics(self, match_type: MatchType):  # type: ignore[override]
+    def _build_analytics(self, match_type: MatchType, video_duration_seconds: float | None = None):  # type: ignore[override]
         raise RuntimeError(f"pipeline exploded for {match_type.value}")
 
 
@@ -479,6 +515,29 @@ def test_ai_failure_falls_back_to_placeholder_and_adds_warning(
     ]
     assert report_response.status_code == 200
     assert report_response.json()["coach_view"]["summary"]
+    assert report_response.json()["generation_mode"] == "fallback"
+    assert report_response.json()["analysis_evidence"]["shuttle"]["summary"]
+    assert report_response.json()["llm_provider"] is None
+    assert report_response.json()["ai_rationale"] is None
+
+
+def test_completed_report_includes_llm_provenance_and_analysis_evidence(
+    client: TestClient,
+) -> None:
+    analysis_id, _ = _ready_analysis(client)
+
+    client.post(f"/api/analyses/{analysis_id}/run")
+    _poll_until_terminal(client, analysis_id)
+    report = client.get(f"/api/analyses/{analysis_id}/report").json()
+
+    assert report["generation_mode"] in {"ai", "fallback"}
+    assert report["llm_provider"] is None
+    assert report["llm_model"] is None
+    assert report["analysis_evidence"]["movement_summary"]
+    assert report["analysis_evidence"]["shuttle"]["summary"]
+    assert report["analytics_view"]["shuttle"]["heatmap"]
+    assert "uncertainty_note" in report["analytics_view"]["shuttle"]
+    assert report["ai_rationale"] is None
 
 
 def test_failed_analysis_sets_error_details_and_status_poll_remains_200(
@@ -574,20 +633,30 @@ def test_owner_header_populates_records_and_hides_other_owners(client: TestClien
     assert unauthorized_setup.json()["detail"] == "Analysis not found."
 
 
-def test_pydanticai_engine_can_drive_coach_feedback(
+def test_build_coach_feedback_engine_defaults_to_gemini_flash() -> None:
+    engine = build_coach_feedback_engine_from_env(
+        engine_name="llm",
+        provider=None,
+        model=None,
+    )
+
+    assert isinstance(engine, LLMCoachFeedbackEngine)
+    assert engine.provider_name == "gemini"
+    assert engine.model_name == "gemini-3-flash-preview"
+
+
+def test_llm_engine_can_drive_coach_feedback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    class FakeAgent:
-        def __init__(self, model: str, **kwargs: object) -> None:
-            assert model == "openai:gpt-5.2"
-            assert kwargs["output_type"] is CoachView
-            assert "instructions" in kwargs
-
-        def run_sync(self, prompt: str) -> SimpleNamespace:
+    class FakeLLMClient:
+        def generate(self, *, provider: str, model: str, prompt: str) -> dict[str, object]:
+            assert provider == "gemini"
+            assert model == "gemini-3-flash-preview"
+            assert "analysis_evidence" in prompt
             assert "confidence_annotations" in prompt
             assert "tracked_player" in prompt
-            return SimpleNamespace(
-                output=CoachView(
+            return {
+                "coach_view": CoachView(
                     summary="AI summary",
                     strengths=["AI strength"],
                     priority_issues=["AI issue"],
@@ -596,16 +665,23 @@ def test_pydanticai_engine_can_drive_coach_feedback(
                     positioning_notes="AI positioning notes",
                     confidence_notes="AI confidence notes",
                     recommended_drills=["AI drill"],
-                )
-            )
+                ).model_dump(mode="json"),
+                "ai_rationale": {
+                    "summary": "AI rationale",
+                    "evidence_highlights": ["Birdie pressure repeated through the forecourt."],
+                },
+            }
 
-    monkeypatch.setitem(sys.modules, "pydantic_ai", SimpleNamespace(Agent=FakeAgent))
     monkeypatch.setattr(
         main_module,
         "service",
         AnalysisService(
             store=AnalysisStore(),
-            coach_feedback_engine=PydanticAICoachFeedbackEngine(model="openai:gpt-5.2"),
+            coach_feedback_engine=LLMCoachFeedbackEngine(
+                provider="gemini",
+                model="gemini-3-flash-preview",
+                client_factory=lambda _provider: FakeLLMClient(),
+            ),
             cv_pipeline=FakeCVPipeline(),
         ),
     )
@@ -621,6 +697,10 @@ def test_pydanticai_engine_can_drive_coach_feedback(
     assert statuses[-1]["stage"] == "completed"
     assert report_response.status_code == 200
     assert report_response.json()["coach_view"]["summary"] == "AI summary"
+    assert report_response.json()["generation_mode"] == "ai"
+    assert report_response.json()["llm_provider"] == "gemini"
+    assert report_response.json()["llm_model"] == "gemini-3-flash-preview"
+    assert report_response.json()["ai_rationale"]["summary"] == "AI rationale"
 
 
 def test_pagination_clamps_invalid_page_values(client: TestClient) -> None:
@@ -685,12 +765,16 @@ def test_rerun_after_failure_produces_new_report(
     call_count = 0
 
     class FailOncePipelineService(AnalysisService):
-        def _build_analytics(self, match_type: MatchType):  # type: ignore[override]
+        def _build_analytics(  # type: ignore[override]
+            self,
+            match_type: MatchType,
+            video_duration_seconds: float | None = None,
+        ):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
                 raise RuntimeError("transient failure")
-            return super()._build_analytics(match_type)
+            return super()._build_analytics(match_type, video_duration_seconds)
 
     monkeypatch.setattr(
         main_module,

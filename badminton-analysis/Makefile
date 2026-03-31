@@ -1,4 +1,4 @@
-.PHONY: install install-backend install-frontend run check-env kill test test-backend test-frontend
+.PHONY: install install-backend install-frontend run run-mock check-env kill test test-backend test-frontend
 
 check-env:
 	@if test "$(VIRTUAL_ENV)" = "" ; then \
@@ -30,6 +30,12 @@ test-frontend:
 
 run: check-env
 	@trap 'echo "Stopping services..."; lsof -ti:8000 | xargs kill -9 2>/dev/null || true; lsof -ti:5173 | xargs kill -9 2>/dev/null || true; echo "Stopped ports 8000 and 5173"' INT TERM; \
-	(cd backend && uv run uvicorn badminton_analysis_api.main:app --reload --port 8000) & \
+	(cd backend && MEDIA_PIPELINE=shell CV_PIPELINE=hybrid uv run uvicorn badminton_analysis_api.api.app:app --reload --port 8000) & \
+	(cd frontend && pnpm dev) & \
+	wait || true
+
+run-mock: check-env
+	@trap 'echo "Stopping services..."; lsof -ti:8000 | xargs kill -9 2>/dev/null || true; lsof -ti:5173 | xargs kill -9 2>/dev/null || true; echo "Stopped ports 8000 and 5173"' INT TERM; \
+	(cd backend && uv run uvicorn badminton_analysis_api.api.app:app --reload --port 8000) & \
 	(cd frontend && pnpm dev) & \
 	wait || true

@@ -22,8 +22,10 @@ import type {
   AnalysisSetupResponse,
   AnalysisStatusResponse,
   CourtPoint,
+  HeatmapCell,
   MatchType,
   PlayerCandidate,
+  ShotSelectionEvent,
 } from "./types";
 
 const matchTypes: Array<{ value: MatchType; label: string }> = [
@@ -39,6 +41,148 @@ type ReportTab = "coach" | "analytics";
 
 function clamp(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+/** Parse "MM:SS" timestamp to total seconds. */
+function parseTimestamp(ts: string): number {
+  const parts = ts.split(":");
+  if (parts.length === 2) return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  if (parts.length === 3)
+    return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseInt(parts[2], 10);
+  return 0;
+}
+
+/** Build a YouTube URL that starts at the given "MM:SS" timestamp. */
+function youtubeTimestampUrl(baseUrl: string, timestamp: string): string {
+  const seconds = parseTimestamp(timestamp);
+  const url = new URL(baseUrl);
+  url.searchParams.set("t", String(seconds));
+  return url.toString();
+}
+
+/** Map heatmap zone name (e.g. "front-left") to a grid position. */
+const ZONE_GRID: Record<string, [number, number]> = {
+  "front-left": [0, 0],
+  "front-centre": [0, 1],
+  "front-right": [0, 2],
+  "mid-left": [1, 0],
+  "mid-centre": [1, 1],
+  "mid-right": [1, 2],
+  "rear-left": [2, 0],
+  "rear-centre": [2, 1],
+  "rear-right": [2, 2],
+};
+
+/** Color intensity from weight (0-1). Returns a blue shade. */
+function heatColor(weight: number): string {
+  const w = Math.max(0, Math.min(1, weight));
+  if (w < 0.05) return "rgb(241 245 249)"; // slate-100
+  // Interpolate from light blue to dark blue
+  const r = Math.round(219 - 180 * w);
+  const g = Math.round(234 - 150 * w);
+  const b = Math.round(254 - 30 * w);
+  return `rgb(${r} ${g} ${b})`;
+}
+
+function CourtHeatmap({ cells }: { cells: HeatmapCell[] }) {
+  const grid: (HeatmapCell | null)[][] = [
+    [null, null, null],
+    [null, null, null],
+    [null, null, null],
+  ];
+  const maxWeight = Math.max(...cells.map((c) => c.weight), 0.01);
+  for (const cell of cells) {
+    const pos = ZONE_GRID[cell.zone];
+    if (pos) grid[pos[0]][pos[1]] = cell;
+  }
+
+  return (
+    <div className="mt-2">
+      {/* Court outline */}
+      <div className="relative border-2 border-slate-400 rounded-lg overflow-hidden">
+        {/* Net line */}
+        <div className="absolute left-0 right-0 top-1/3 border-t-2 border-dashed border-slate-300 pointer-events-none" />
+        <div className="grid grid-rows-3">
+          {grid.map((row, ri) => (
+            <div className="grid grid-cols-3" key={ri}>
+              {row.map((cell, ci) => {
+                const normalized = cell ? cell.weight / maxWeight : 0;
+                const pct = cell ? Math.round(cell.weight * 100) : 0;
+                const zoneName = cell?.zone ?? "";
+                return (
+                  <div
+                    key={ci}
+                    className="flex flex-col items-center justify-center aspect-[4/3] border border-slate-200/50 transition-colors"
+                    style={{ backgroundColor: heatColor(normalized) }}
+                  >
+                    <span className="text-lg font-bold text-slate-800">{pct}%</span>
+                    <span className="text-[10px] text-slate-500 capitalize">
+                      {zoneName.replace("-", " ")}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Legend */}
+      <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
+        <span>Low</span>
+        <div className="flex-1 h-2 rounded-full bg-gradient-to-r from-slate-100 via-blue-200 to-blue-600" />
+        <span>High</span>
+      </div>
+    </div>
+  );
+}
+
+function ShotEventCard({
+  event,
+  youtubeUrl,
+}: {
+  event: ShotSelectionEvent;
+  youtubeUrl: string;
+}) {
+  const qualityColor =
+    event.decision_quality === "strong"
+      ? "bg-green-100 text-green-700"
+      : event.decision_quality === "poor"
+        ? "bg-red-100 text-red-700"
+        : "bg-slate-200 text-slate-600";
+
+  return (
+    <article className="p-4 border border-slate-200 rounded-xl bg-slate-50">
+      <div className="flex flex-col gap-1 mb-2">
+        <div className="flex items-center gap-2">
+          <a
+            href={youtubeTimestampUrl(youtubeUrl, event.timestamp)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z" />
+            </svg>
+            {event.timestamp}
+          </a>
+          <span className="text-sm text-slate-800 font-medium">{event.shot_type}</span>
+        </div>
+        <span className="text-xs text-slate-500">
+          Execution {event.execution_score} / Decision {event.decision_score}
+        </span>
+      </div>
+      <p className={`inline-block px-2 py-1 rounded-full text-xs capitalize mb-2 ${qualityColor}`}>
+        {event.decision_quality}
+      </p>
+      {event.recommendation ? (
+        <p className="text-sm text-slate-600">{event.recommendation}</p>
+      ) : null}
+      <p className="text-xs font-semibold tracking-widest uppercase text-blue-600 mt-2">
+        Evidence
+      </p>
+      <p className="text-xs text-slate-400 mt-1">{event.evidence}</p>
+    </article>
+  );
 }
 
 function formatMatchType(matchType: MatchType): string {
@@ -393,6 +537,42 @@ function App() {
                     src={setup.setup_frame_url}
                   />
                   <div className="absolute inset-0">
+                    {/* Player bounding box overlays */}
+                    {setup.players.map((player) =>
+                      player.bounding_box ? (
+                        <button
+                          aria-label={player.label}
+                          key={player.player_id}
+                          className={`absolute border-2 rounded-md transition-all cursor-pointer ${
+                            selectedPlayer?.player_id === player.player_id
+                              ? "border-blue-500 bg-blue-500/20 shadow-[0_0_12px_rgba(59,130,246,0.5)]"
+                              : "border-white/70 bg-white/10 hover:border-blue-400 hover:bg-blue-400/15"
+                          }`}
+                          onClick={() => setSelectedPlayer(player)}
+                          style={
+                            {
+                              left: `${player.bounding_box.x * 100}%`,
+                              top: `${player.bounding_box.y * 100}%`,
+                              width: `${player.bounding_box.width * 100}%`,
+                              height: `${player.bounding_box.height * 100}%`,
+                            } satisfies CSSProperties
+                          }
+                          type="button"
+                        >
+                          <span
+                            className={`absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-0.5 rounded text-xs font-semibold ${
+                              selectedPlayer?.player_id === player.player_id
+                                ? "bg-blue-500 text-white"
+                                : "bg-black/60 text-white"
+                            }`}
+                          >
+                            {player.label}
+                          </span>
+                        </button>
+                      ) : null,
+                    )}
+
+                    {/* Court corner handles */}
                     {courtPoints.map((point, index) => (
                       <button
                         aria-label={`Court corner ${index + 1}`}
@@ -552,6 +732,37 @@ function App() {
                       {report.coach_view.summary}
                     </p>
                   </article>
+                  <article className="p-4 border border-slate-200 rounded-xl bg-slate-50">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      AI provenance
+                    </p>
+                    <p className="mt-2 text-sm text-slate-700">
+                      {report.llm_provider && report.llm_model
+                        ? `${report.llm_provider} · ${report.llm_model}`
+                        : "Deterministic fallback coaching"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {report.generation_mode === "ai"
+                        ? "Structured coaching came from the configured LLM provider."
+                        : "The service fell back to deterministic coaching after the AI path failed or was disabled."}
+                    </p>
+                  </article>
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      AI rationale
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {report.ai_rationale?.summary ??
+                        "No separate AI rationale was returned for this report."}
+                    </p>
+                    {report.ai_rationale?.evidence_highlights.length ? (
+                      <ul className="mt-3 pl-4 text-sm text-slate-600 list-disc space-y-1">
+                        {report.ai_rationale.evidence_highlights.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </article>
                   <article className="p-4 border border-slate-200 rounded-xl">
                     <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
                       Strengths
@@ -613,6 +824,16 @@ function App() {
                         <li key={item}>{item}</li>
                       ))}
                     </ul>
+                  </article>
+                  <article className="sm:col-span-2 p-4 border border-slate-200 rounded-xl bg-slate-50">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Evidence summary
+                    </p>
+                    <div className="mt-3 grid sm:grid-cols-3 gap-3 text-sm text-slate-600">
+                      <p>{report.analysis_evidence.movement_summary}</p>
+                      <p>{report.analysis_evidence.mechanics_summary}</p>
+                      <p>{report.analysis_evidence.shot_selection_summary}</p>
+                    </div>
                   </article>
                 </div>
               ) : null}
@@ -707,21 +928,9 @@ function App() {
                     </div>
                     <div className="mt-4">
                       <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
-                        Heatmap
+                        Court heatmap
                       </p>
-                      <div className="grid grid-cols-3 gap-2 mt-2">
-                        {report.analytics_view.positioning.heatmap.map((cell) => (
-                          <article
-                            className="p-3 border border-slate-200 rounded-lg bg-blue-50"
-                            key={cell.zone}
-                          >
-                            <strong className="text-xs text-slate-700">{cell.zone}</strong>
-                            <span className="block text-sm text-blue-600 font-semibold">
-                              {Math.round(cell.weight * 100)}%
-                            </span>
-                          </article>
-                        ))}
-                      </div>
+                      <CourtHeatmap cells={report.analytics_view.positioning.heatmap} />
                     </div>
                   </article>
 
@@ -734,28 +943,42 @@ function App() {
                     </p>
                     <div className="grid gap-3 mt-4">
                       {report.analytics_view.shot_selection.events.map((event) => (
-                        <article
-                          className="p-4 border border-slate-200 rounded-xl bg-slate-50"
+                        <ShotEventCard
                           key={`${event.timestamp}-${event.shot_type}`}
+                          event={event}
+                          youtubeUrl={youtubeUrl}
+                        />
+                      ))}
+                    </div>
+                  </article>
+
+                  <article className="p-4 border border-slate-200 rounded-xl">
+                    <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                      Shuttle evidence
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {report.analysis_evidence.shuttle.summary}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {report.analysis_evidence.shuttle.uncertainty_note}
+                    </p>
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold tracking-widest uppercase text-blue-600">
+                        Shuttle heatmap
+                      </p>
+                      <CourtHeatmap cells={report.analytics_view.shuttle.heatmap} />
+                    </div>
+                    <div className="grid gap-3 mt-4">
+                      {report.analysis_evidence.shuttle.pressure_windows.map((window) => (
+                        <article
+                          className="p-3 border border-slate-200 rounded-lg bg-slate-50"
+                          key={`${window.label}-${window.start_timestamp}-${window.end_timestamp}`}
                         >
-                          <div className="flex flex-col gap-1 mb-2">
-                            <strong className="text-sm text-slate-800">
-                              {event.timestamp} &middot; {event.shot_type}
-                            </strong>
-                            <span className="text-xs text-slate-500">
-                              Execution {event.execution_score} / Decision {event.decision_score}
-                            </span>
-                          </div>
-                          <p className="inline-block px-2 py-1 rounded-full bg-slate-200 text-xs capitalize mb-2">
-                            {event.decision_quality}
-                          </p>
-                          {event.recommendation ? (
-                            <p className="text-sm text-slate-600">{event.recommendation}</p>
-                          ) : null}
-                          <p className="text-xs font-semibold tracking-widest uppercase text-blue-600 mt-2">
-                            Evidence
-                          </p>
-                          <p className="text-xs text-slate-400 mt-1">{event.evidence}</p>
+                          <strong className="text-sm text-slate-700">{window.label}</strong>
+                          <span className="block mt-1 text-xs text-blue-600 font-semibold">
+                            {window.start_timestamp} - {window.end_timestamp}
+                          </span>
+                          <p className="mt-1 text-xs text-slate-500">{window.summary}</p>
                         </article>
                       ))}
                     </div>
@@ -805,10 +1028,16 @@ function App() {
               AI layer
             </p>
             <strong className="block mt-2 text-sm text-slate-800">
-              Typed single-pass placeholder
+              {report?.llm_model
+                ? `${report.llm_provider} · ${report.llm_model}`
+                : "Deterministic fallback"}
             </strong>
             <span className="block mt-1 text-xs text-slate-400">
-              Structured coach notes can layer on top later without changing the report contract.
+              {report
+                ? report.generation_mode === "ai"
+                  ? "Coach feedback came from the configured AI provider with structured evidence."
+                  : "Coach feedback fell back to deterministic logic while preserving the expanded evidence contract."
+                : "Provider-backed coaching is configurable without changing the frontend contract."}
             </span>
           </article>
         </aside>
