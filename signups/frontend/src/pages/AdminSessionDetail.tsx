@@ -113,7 +113,7 @@ export default function AdminSessionDetail() {
               </span>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-3 grid-cols-2 xl:grid-cols-4">
               <div className="rounded-[1.5rem] border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
                   Date
@@ -145,7 +145,7 @@ export default function AdminSessionDetail() {
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-end">
+            <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
               <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
                   Cost split
