@@ -56,12 +56,12 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
     onRefresh()
   }
 
-  async function handleMarkAllPaid() {
-    const unpaid = confirmed.filter((s) => !(optimisticPaid[s.id] ?? s.paid))
-    if (unpaid.length === 0) return
-    if (!window.confirm(`Mark all ${unpaid.length} player${unpaid.length === 1 ? '' : 's'} as paid?`)) return
-    setOptimisticPaid((prev) => Object.fromEntries(confirmed.map((s) => [s.id, true])) as typeof prev)
-    await Promise.all(unpaid.map((s) => markSignupPaid(s.id, true)))
+  async function handleMarkAll(paid: boolean) {
+    const targets = confirmed.filter((s) => (optimisticPaid[s.id] ?? s.paid) !== paid)
+    if (targets.length === 0) return
+    if (!paid && !window.confirm(`Mark all ${targets.length} player${targets.length === 1 ? '' : 's'} as unpaid?`)) return
+    setOptimisticPaid(Object.fromEntries(confirmed.map((s) => [s.id, paid])))
+    await Promise.all(targets.map((s) => markSignupPaid(s.id, paid)))
     onRefresh()
   }
 
@@ -88,11 +88,22 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
             </div>
             <p className="text-xs text-ink-500">Tap card to mark paid · Tap amount to edit</p>
           </div>
-          {confirmed.some((s) => !(optimisticPaid[s.id] ?? s.paid)) ? (
-            <Button type="button" variant="secondary" onClick={() => void handleMarkAllPaid()}>
-              Mark all paid
-            </Button>
-          ) : null}
+          {confirmed.length > 0 ? (() => {
+            const allPaid = confirmed.every((s) => optimisticPaid[s.id] ?? s.paid)
+            return (
+              <button
+                type="button"
+                onClick={() => void handleMarkAll(!allPaid)}
+                className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition ${
+                  allPaid
+                    ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}
+              >
+                {allPaid ? 'Mark all unpaid' : 'Mark all paid'}
+              </button>
+            )
+          })() : null}
         </div>
         <div className="space-y-3" data-testid="roster-list">
           {confirmed.map((signup) => {
