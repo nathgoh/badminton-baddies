@@ -59,7 +59,10 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
   async function handleMarkAll(paid: boolean) {
     const targets = confirmed.filter((s) => (optimisticPaid[s.id] ?? s.paid) !== paid)
     if (targets.length === 0) return
-    if (!paid && !window.confirm(`Mark all ${targets.length} player${targets.length === 1 ? '' : 's'} as unpaid?`)) return
+    const msg = paid
+      ? `Mark all ${targets.length} player${targets.length === 1 ? '' : 's'} as paid?`
+      : `Mark all ${targets.length} player${targets.length === 1 ? '' : 's'} as unpaid?`
+    if (!window.confirm(msg)) return
     setOptimisticPaid(Object.fromEntries(confirmed.map((s) => [s.id, paid])))
     await Promise.all(targets.map((s) => markSignupPaid(s.id, paid)))
     onRefresh()
@@ -80,7 +83,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
   return (
     <div className="grid gap-4">
       <Card className="space-y-5">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-700">Roster</div>
             <div className="text-2xl font-semibold text-ink-950">
@@ -97,7 +100,7 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
                 className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition ${
                   allPaid
                     ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                 }`}
               >
                 {allPaid ? 'Mark all unpaid' : 'Mark all paid'}
