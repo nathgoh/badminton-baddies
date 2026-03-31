@@ -153,7 +153,7 @@ export default function AdminSessionDetail() {
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.08fr)_minmax(280px,0.92fr)] lg:items-stretch">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1.08fr)] xl:items-stretch">
               <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur-sm lg:p-5">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
                   Cost split
@@ -178,7 +178,7 @@ export default function AdminSessionDetail() {
 
               <div className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/8 p-4 backdrop-blur-sm lg:content-between lg:p-5">
                 <div className="space-y-3">
-                  <div className="rounded-[1.25rem] border border-white/10 bg-white/10 px-4 py-3">
+                  <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
                       Actions
                     </div>
