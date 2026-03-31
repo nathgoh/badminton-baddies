@@ -53,7 +53,6 @@ ANALYZING_PROGRESS_STEPS: list[tuple[int, str]] = [
 ]
 
 
-
 def _build_setup_frame_url(analysis_id: str) -> str:
     """Minimal fallback data-URI when no media pipeline produced a real frame."""
     svg = (
