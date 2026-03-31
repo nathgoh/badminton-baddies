@@ -16,7 +16,6 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
   const waitlisted = signups.filter((signup) => signup.status === 'waitlist')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState('')
-  const [originalAmount, setOriginalAmount] = useState('')
   const [optimisticPaid, setOptimisticPaid] = useState<Record<string, boolean>>({})
   const [dropdownId, setDropdownId] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -64,10 +63,8 @@ export default function RosterManager({ signups, onRefresh, costPerPlayer }: Pro
   }
 
   function startEditingAmount(signup: Signup) {
-    const value = signup.amount_owed != null ? String(signup.amount_owed) : ''
     setEditingId(signup.id)
-    setEditAmount(value)
-    setOriginalAmount(value)
+    setEditAmount(signup.amount_owed != null ? String(signup.amount_owed) : '')
   }
 
   return (
