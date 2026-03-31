@@ -153,7 +153,7 @@ export default function AdminSessionDetail() {
               </div>
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-4 xl:items-stretch">
+            <div className="grid gap-3 xl:grid-cols-4 xl:items-stretch">
               <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur-sm lg:p-5 xl:col-span-2">
                 <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
                   Cost split

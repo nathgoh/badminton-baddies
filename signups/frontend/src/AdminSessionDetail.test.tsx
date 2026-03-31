@@ -31,4 +31,9 @@ describe('AdminSessionDetail structure hooks', () => {
   it('keeps a single conditional status badge expression', () => {
     expect(AdminSessionDetailSource).toContain("data.session.is_active ? 'Active' : 'Draft'")
   })
+
+  it('uses the same desktop column rhythm for the top and lower hero grids', () => {
+    expect(AdminSessionDetailSource).toContain('grid grid-cols-2 gap-3 xl:grid-cols-4')
+    expect(AdminSessionDetailSource).toContain('grid gap-3 xl:grid-cols-4 xl:items-stretch')
+  })
 })
