@@ -663,3 +663,63 @@ def test_lists_paginated_analyses_and_delete_removes_record(client: TestClient) 
 
     assert missing_response.status_code == 404
     assert refreshed_page.json()["total"] == 2
+
+
+def test_delete_removes_all_sub_resources(client: TestClient) -> None:
+    analysis_id, _ = _ready_analysis(client)
+    client.post(f"/api/analyses/{analysis_id}/run")
+    _poll_until_terminal(client, analysis_id)
+
+    delete_response = client.delete(f"/api/analyses/{analysis_id}")
+    assert delete_response.status_code == 204
+
+    assert client.get(f"/api/analyses/{analysis_id}/setup").status_code == 404
+    assert client.get(f"/api/analyses/{analysis_id}/status").status_code == 404
+    assert client.get(f"/api/analyses/{analysis_id}/report").status_code == 404
+
+
+def test_rerun_after_failure_produces_new_report(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    call_count = 0
+
+    class FailOncePipelineService(AnalysisService):
+        def _build_analytics(self, match_type: MatchType):  # type: ignore[override]
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise RuntimeError("transient failure")
+            return super()._build_analytics(match_type)
+
+    monkeypatch.setattr(
+        main_module,
+        "service",
+        FailOncePipelineService(
+            store=AnalysisStore(),
+            media_artifact_pipeline=FakeMediaArtifactPipeline(tmp_path),
+            cv_pipeline=FakeCVPipeline(),
+        ),
+    )
+    with TestClient(main_module.app) as client:
+        analysis_id, setup_payload = _ready_analysis(client)
+
+        client.post(f"/api/analyses/{analysis_id}/run")
+        statuses = _poll_until_terminal(client, analysis_id)
+        assert statuses[-1]["stage"] == "failed"
+
+        # Re-select and re-run
+        client.post(
+            f"/api/analyses/{analysis_id}/selection",
+            json={
+                "player_id": setup_payload["players"][0]["player_id"],
+                "court_points": setup_payload["court"]["points"],
+            },
+        )
+        client.post(f"/api/analyses/{analysis_id}/run")
+        statuses = _poll_until_terminal(client, analysis_id)
+
+        assert statuses[-1]["stage"] == "completed"
+        report = client.get(f"/api/analyses/{analysis_id}/report")
+        assert report.status_code == 200
+        assert report.json()["coach_view"]["summary"]
