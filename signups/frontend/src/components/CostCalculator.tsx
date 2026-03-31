@@ -8,7 +8,7 @@ import type { AdminSessionResponse } from '../types'
 
 interface Props {
   data: AdminSessionResponse
-  onRefresh: () => void
+  onRefresh: () => void | Promise<void>
 }
 
 const EMPTY_COURT = { name: '', start_time: '19:00', end_time: '22:00', max_players: '6', total_cost: '' }
@@ -38,7 +38,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
       return
     }
     await regenerateToken(data.session.id)
-    onRefresh()
+    await onRefresh()
   }
 
   function startEditCourt(courtId: string) {
@@ -64,13 +64,13 @@ export default function CostCalculator({ data, onRefresh }: Props) {
     })
     setEditingCourtId(null)
     setEditValues(null)
-    onRefresh()
+    await onRefresh()
   }
 
   async function handleDeleteCourt(courtId: string) {
     if (!window.confirm('Remove this court?')) return
     await deleteCourt(courtId)
-    onRefresh()
+    await onRefresh()
   }
 
   async function handleAddCourt(event: React.FormEvent) {
@@ -86,7 +86,7 @@ export default function CostCalculator({ data, onRefresh }: Props) {
       })
       setNewCourt(EMPTY_COURT)
       setShowAddCourt(false)
-      onRefresh()
+      await onRefresh()
     } finally {
       setAddingCourt(false)
     }

@@ -7,7 +7,7 @@ import type { Signup } from '../types'
 
 interface Props {
   signups: Signup[]
-  onRefresh: () => void
+  onRefresh: () => void | Promise<void>
 }
 
 export default function RosterManager({ signups, onRefresh }: Props) {
@@ -19,17 +19,17 @@ export default function RosterManager({ signups, onRefresh }: Props) {
   async function handleSaveAmount(signupId: string) {
     await updateSignupAmount(signupId, parseFloat(editAmount))
     setEditingId(null)
-    onRefresh()
+    await onRefresh()
   }
 
   async function handlePromote(signupId: string) {
     await promoteFromWaitlist(signupId)
-    onRefresh()
+    await onRefresh()
   }
 
   async function handleTogglePaid(signupId: string, currentPaid: boolean) {
     await markSignupPaid(signupId, !currentPaid)
-    onRefresh()
+    await onRefresh()
   }
 
   async function handleCancel(signupId: string) {
@@ -37,7 +37,7 @@ export default function RosterManager({ signups, onRefresh }: Props) {
       return
     }
     await adminCancelSignup(signupId)
-    onRefresh()
+    await onRefresh()
   }
 
   function startEditingAmount(signup: Signup) {

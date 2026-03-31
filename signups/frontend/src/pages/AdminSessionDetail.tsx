@@ -21,8 +21,12 @@ export default function AdminSessionDetail() {
     setData(await getAdminSession(id))
   }
 
-  function handleRefresh() {
-    void load()
+  async function handleRefresh() {
+    try {
+      await load()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error))
+    }
   }
 
   useEffect(() => {
