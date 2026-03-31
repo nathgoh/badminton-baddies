@@ -20,13 +20,11 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
 }
 
-function formatCancelWindow(hours: number) {
-  if (hours % 24 === 0) {
-    const days = hours / 24
-    return `${days} day${days === 1 ? '' : 's'}`
-  }
-
-  return `${hours} hour${hours === 1 ? '' : 's'}`
+function cancelWindowLabel(date: string, cancelWindowHours: number): string {
+  const deadlineMs = new Date(date).getTime() - cancelWindowHours * 60 * 60 * 1000
+  const daysLeft = Math.ceil((deadlineMs - Date.now()) / (1000 * 60 * 60 * 24))
+  if (daysLeft <= 0) return 'Cancellation closed'
+  return `${daysLeft} day${daysLeft === 1 ? '' : 's'} to cancel`
 }
 
 const inputClassName =
@@ -124,14 +122,22 @@ export default function AdminSessionList() {
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 space-y-1">
-            <div className="inline-flex rounded-full bg-sand-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-ink-700">
-              {session.is_active ? 'Active' : 'Draft'}
-            </div>
             <div className="text-xl font-semibold text-ink-950">{session.name}</div>
-            <div className="text-sm text-ink-700">{session.date}</div>
+            <div className="text-sm text-ink-700">
+              {new Date(session.date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </div>
+            <div className="text-xs font-medium text-ink-500">
+              {cancelWindowLabel(session.date, session.cancel_window_hours)}
+            </div>
           </div>
-          <div className="shrink-0 rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
-            {formatCancelWindow(session.cancel_window_hours)} cancel
+          <div
+            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
+              session.is_active
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            {session.is_active ? 'Active' : 'Draft'}
           </div>
         </div>
 
