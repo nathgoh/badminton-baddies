@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from ..models import PlayerUpsert
+from ..models import PlayerUpsert, SignupUpdate
 
 
 def _setup(client):
@@ -112,31 +112,62 @@ def test_confirmed_signup_recalculates_costs(client):
     }
 
 
-def test_promote_from_waitlist(client):
+def test_promote_from_waitlist(client, storage):
     session = _setup(client)
     token = session["access_token"]
-    _signup(client, token, "a@t.com", "Alice")
-    _signup(client, token, "b@t.com", "Bob")
-    _signup(client, token, "c@t.com", "Carol")
-    _signup(client, token, "d@t.com", "Dan")
+    alice = _signup(client, token, "a@t.com", "Alice").json()
+    bob = _signup(client, token, "b@t.com", "Bob").json()
+    carol = _signup(client, token, "c@t.com", "Carol").json()
+    dan = _signup(client, token, "d@t.com", "Dan").json()
     waitlist_signup = _signup(client, token, "e@t.com", "Eve").json()
 
     assert waitlist_signup["status"] == "waitlist"
+
+    storage.update_signup(alice["id"], SignupUpdate(amount_owed=11.0))
+    storage.update_signup(bob["id"], SignupUpdate(amount_owed=12.0))
+    storage.update_signup(carol["id"], SignupUpdate(amount_owed=13.0))
+    storage.update_signup(dan["id"], SignupUpdate(amount_owed=14.0))
 
     response = client.post(f"/api/admin/signups/{waitlist_signup['id']}/promote")
 
     assert response.status_code == 200
     assert response.json()["status"] == "confirmed"
 
+    session_response = client.get(f"/api/admin/sessions/{session['id']}")
+    signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
+    assert {email: signups[email]["amount_owed"] for email in ["a@t.com", "b@t.com", "c@t.com", "d@t.com", "e@t.com"]} == {
+        "a@t.com": 6.0,
+        "b@t.com": 6.0,
+        "c@t.com": 6.0,
+        "d@t.com": 6.0,
+        "e@t.com": 6.0,
+    }
 
-def test_admin_cancel_signup(client):
+
+def test_admin_cancel_signup(client, storage):
     session = _setup(client)
-    signup = _signup(client, session["access_token"], "a@t.com", "Alice").json()
+    token = session["access_token"]
+    signup_a = _signup(client, token, "a@t.com", "Alice").json()
+    signup_b = _signup(client, token, "b@t.com", "Bob").json()
+    signup_c = _signup(client, token, "c@t.com", "Carol").json()
+    signup_d = _signup(client, token, "d@t.com", "Dan").json()
 
-    response = client.delete(f"/api/admin/signups/{signup['id']}")
+    storage.update_signup(signup_a["id"], SignupUpdate(amount_owed=11.0))
+    storage.update_signup(signup_b["id"], SignupUpdate(amount_owed=12.0))
+    storage.update_signup(signup_c["id"], SignupUpdate(amount_owed=13.0))
+    storage.update_signup(signup_d["id"], SignupUpdate(amount_owed=14.0))
+
+    response = client.delete(f"/api/admin/signups/{signup_a['id']}")
 
     assert response.status_code == 200
     assert response.json()["status"] == "cancelled"
+
+    session_response = client.get(f"/api/admin/sessions/{session['id']}")
+    signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
+    assert "a@t.com" not in signups
+    assert signups["b@t.com"]["amount_owed"] == 10.0
+    assert signups["c@t.com"]["amount_owed"] == 10.0
+    assert signups["d@t.com"]["amount_owed"] == 10.0
 
 
 def test_regenerate_token(client):
@@ -179,54 +210,51 @@ def test_admin_cancel_promotes_from_waitlist(client):
     assert dan_after["status"] == "confirmed"
 
 
-def test_waitlist_signup_does_not_recalculate_costs(client, monkeypatch):
-    from ..routers import admin as admin_router
-
+def test_waitlist_signup_does_not_recalculate_costs(client, storage):
     session = _setup(client)
     token = session["access_token"]
-    _signup(client, token, "a@t.com", "Alice")
-    _signup(client, token, "b@t.com", "Bob")
-    _signup(client, token, "c@t.com", "Carol")
-    _signup(client, token, "d@t.com", "Dan")
+    signup_a = _signup(client, token, "a@t.com", "Alice").json()
+    signup_b = _signup(client, token, "b@t.com", "Bob").json()
+    signup_c = _signup(client, token, "c@t.com", "Carol").json()
+    signup_d = _signup(client, token, "d@t.com", "Dan").json()
 
-    response = client.post(f"/api/admin/sessions/{session['id']}/calculate-costs")
-    assert response.status_code == 200
-    assert response.json()["base_amount"] == 7.5
+    storage.update_signup(signup_a["id"], SignupUpdate(amount_owed=11.0))
+    storage.update_signup(signup_b["id"], SignupUpdate(amount_owed=12.0))
+    storage.update_signup(signup_c["id"], SignupUpdate(amount_owed=13.0))
+    storage.update_signup(signup_d["id"], SignupUpdate(amount_owed=14.0))
 
     before_waitlist = client.get(f"/api/admin/sessions/{session['id']}")
-    expected_amounts = {
+    assert {
         signup["email"]: signup["amount_owed"]
         for signup in before_waitlist.json()["signups"]
         if signup["status"] == "confirmed"
+    } == {
+        "a@t.com": 11.0,
+        "b@t.com": 12.0,
+        "c@t.com": 13.0,
+        "d@t.com": 14.0,
     }
-    assert expected_amounts == {
-        "a@t.com": 7.5,
-        "b@t.com": 7.5,
-        "c@t.com": 7.5,
-        "d@t.com": 7.5,
-    }
-
-    call_count = 0
-    original_calculate_costs = admin_router.calculate_costs
-
-    def counting_calculate_costs(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        return original_calculate_costs(*args, **kwargs)
-
-    monkeypatch.setattr(admin_router, "calculate_costs", counting_calculate_costs)
 
     response = _signup(client, token, "e@t.com", "Eve")
 
     assert response.status_code == 201
     assert response.json()["status"] == "waitlist"
-    assert call_count == 0
 
     session_response = client.get(f"/api/admin/sessions/{session['id']}")
     signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
 
     assert signups["e@t.com"]["amount_owed"] is None
-    assert {email: signups[email]["amount_owed"] for email in expected_amounts} == expected_amounts
+    assert {
+        "a@t.com": signups["a@t.com"]["amount_owed"],
+        "b@t.com": signups["b@t.com"]["amount_owed"],
+        "c@t.com": signups["c@t.com"]["amount_owed"],
+        "d@t.com": signups["d@t.com"]["amount_owed"],
+    } == {
+        "a@t.com": 11.0,
+        "b@t.com": 12.0,
+        "c@t.com": 13.0,
+        "d@t.com": 14.0,
+    }
 
 
 def test_manual_amount_edit_recalculates_remaining_confirmed_players(client):
@@ -252,87 +280,76 @@ def test_manual_amount_edit_recalculates_remaining_confirmed_players(client):
     assert signups["c@t.com"]["amount_owed"] == 12.0
 
 
-def test_waitlist_cancel_does_not_recalculate_costs(client, monkeypatch):
-    from ..routers import admin as admin_router
-
+def test_waitlist_cancel_does_not_recalculate_costs(client, storage):
     session = _setup(client)
     token = session["access_token"]
-    _signup(client, token, "a@t.com", "Alice")
-    _signup(client, token, "b@t.com", "Bob")
-    _signup(client, token, "c@t.com", "Carol")
-    _signup(client, token, "d@t.com", "Dan")
+    signup_a = _signup(client, token, "a@t.com", "Alice").json()
+    signup_b = _signup(client, token, "b@t.com", "Bob").json()
+    signup_c = _signup(client, token, "c@t.com", "Carol").json()
+    signup_d = _signup(client, token, "d@t.com", "Dan").json()
 
-    response = client.post(f"/api/admin/sessions/{session['id']}/calculate-costs")
-    assert response.status_code == 200
-    assert response.json()["base_amount"] == 7.5
-
-    before_waitlist = client.get(f"/api/admin/sessions/{session['id']}")
-    expected_amounts = {
-        signup["email"]: signup["amount_owed"]
-        for signup in before_waitlist.json()["signups"]
-        if signup["status"] == "confirmed"
-    }
-    assert expected_amounts == {
-        "a@t.com": 7.5,
-        "b@t.com": 7.5,
-        "c@t.com": 7.5,
-        "d@t.com": 7.5,
-    }
+    storage.update_signup(signup_a["id"], SignupUpdate(amount_owed=11.0))
+    storage.update_signup(signup_b["id"], SignupUpdate(amount_owed=12.0))
+    storage.update_signup(signup_c["id"], SignupUpdate(amount_owed=13.0))
+    storage.update_signup(signup_d["id"], SignupUpdate(amount_owed=14.0))
 
     eve = _signup(client, token, "e@t.com", "Eve").json()
-
-    call_count = 0
-    original_calculate_costs = admin_router.calculate_costs
-
-    def counting_calculate_costs(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        return original_calculate_costs(*args, **kwargs)
-
-    monkeypatch.setattr(admin_router, "calculate_costs", counting_calculate_costs)
 
     response = client.delete(f"/api/admin/signups/{eve['id']}")
 
     assert response.status_code == 200
     assert response.json()["status"] == "cancelled"
-    assert call_count == 0
 
     session_response = client.get(f"/api/admin/sessions/{session['id']}")
     signups = {signup["email"]: signup for signup in session_response.json()["signups"]}
 
     assert "e@t.com" not in signups
-    assert {email: signups[email]["amount_owed"] for email in expected_amounts} == expected_amounts
+    assert {
+        "a@t.com": signups["a@t.com"]["amount_owed"],
+        "b@t.com": signups["b@t.com"]["amount_owed"],
+        "c@t.com": signups["c@t.com"]["amount_owed"],
+        "d@t.com": signups["d@t.com"]["amount_owed"],
+    } == {
+        "a@t.com": 11.0,
+        "b@t.com": 12.0,
+        "c@t.com": 13.0,
+        "d@t.com": 14.0,
+    }
 
 
-def test_admin_cancel_with_waitlist_promotion_recalculates_once_for_final_roster(client, monkeypatch):
-    from ..routers import admin as admin_router
-
+def test_admin_cancel_with_waitlist_promotion_recalculates_once_for_final_roster(client, storage):
     session = _setup(client)
     token = session["access_token"]
-    _signup(client, token, "a@t.com", "Alice")
+    alice = _signup(client, token, "a@t.com", "Alice").json()
     bob = _signup(client, token, "b@t.com", "Bob").json()
-    _signup(client, token, "c@t.com", "Carol")
-    _signup(client, token, "d@t.com", "Dan")
-    _signup(client, token, "e@t.com", "Eve")
+    carol = _signup(client, token, "c@t.com", "Carol").json()
+    dan = _signup(client, token, "d@t.com", "Dan").json()
+    eve = _signup(client, token, "e@t.com", "Eve").json()
 
     baseline = client.post(f"/api/admin/sessions/{session['id']}/calculate-costs")
     assert baseline.status_code == 200
     assert baseline.json()["base_amount"] == 7.5
 
-    call_count = 0
-    original_calculate_costs = admin_router.calculate_costs
+    storage.update_signup(alice["id"], SignupUpdate(amount_owed=11.0))
+    storage.update_signup(bob["id"], SignupUpdate(amount_owed=12.0))
+    storage.update_signup(carol["id"], SignupUpdate(amount_owed=13.0))
+    storage.update_signup(dan["id"], SignupUpdate(amount_owed=14.0))
 
-    def counting_calculate_costs(*args, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        return original_calculate_costs(*args, **kwargs)
+    amount_update_calls = 0
+    original_update_signup = storage.update_signup
 
-    monkeypatch.setattr(admin_router, "calculate_costs", counting_calculate_costs)
+    def counting_update_signup(signup_id, data):
+        nonlocal amount_update_calls
+        if data.amount_owed is not None:
+            amount_update_calls += 1
+        return original_update_signup(signup_id, data)
+
+    storage.update_signup = counting_update_signup
 
     response = client.delete(f"/api/admin/signups/{bob['id']}")
 
     assert response.status_code == 200
-    assert call_count == 1
+    assert amount_update_calls == 4
 
     session_response = client.get(f"/api/admin/sessions/{session['id']}")
     signups = {signup["email"]: signup for signup in session_response.json()["signups"]}

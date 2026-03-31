@@ -101,11 +101,16 @@ def test_calculate_costs_rejects_adjusted_total_above_session_total(client: Test
     s2 = storage.create_signup(SignupCreate(session_id=session_id, email="b@x.com", name="B", payment_agreed=True))
     storage.update_signup(s1.id, SignupUpdate(amount_owed=25.0, amount_adjusted=True))
     storage.update_signup(s2.id, SignupUpdate(amount_owed=10.0, amount_adjusted=True))
+    before = {
+        s1.id: storage._signups[s1.id].amount_owed,
+        s2.id: storage._signups[s2.id].amount_owed,
+    }
 
     response = client.post(f"/api/admin/sessions/{session_id}/calculate-costs")
 
     assert response.status_code == 400
-    assert "exceed" in response.json()["detail"].lower()
+    assert storage._signups[s1.id].amount_owed == before[s1.id]
+    assert storage._signups[s2.id].amount_owed == before[s2.id]
 
 
 def test_calculate_costs_no_confirmed_players_errors(client: TestClient, storage: InMemoryAdapter):
