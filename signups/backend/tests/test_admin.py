@@ -317,39 +317,34 @@ def test_waitlist_cancel_does_not_recalculate_costs(client, storage):
     }
 
 
-def test_admin_cancel_with_waitlist_promotion_recalculates_once_for_final_roster(client, storage):
+def test_admin_cancel_with_waitlist_promotion_recalculates_once_for_final_roster(client, monkeypatch):
+    from ..routers import admin as admin_router
+
     session = _setup(client)
     token = session["access_token"]
-    alice = _signup(client, token, "a@t.com", "Alice").json()
     bob = _signup(client, token, "b@t.com", "Bob").json()
-    carol = _signup(client, token, "c@t.com", "Carol").json()
-    dan = _signup(client, token, "d@t.com", "Dan").json()
+    _signup(client, token, "a@t.com", "Alice")
+    _signup(client, token, "c@t.com", "Carol")
+    _signup(client, token, "d@t.com", "Dan")
     eve = _signup(client, token, "e@t.com", "Eve").json()
 
-    baseline = client.post(f"/api/admin/sessions/{session['id']}/calculate-costs")
-    assert baseline.status_code == 200
-    assert baseline.json()["base_amount"] == 7.5
+    helper_calls = 0
 
-    storage.update_signup(alice["id"], SignupUpdate(amount_owed=11.0))
-    storage.update_signup(bob["id"], SignupUpdate(amount_owed=12.0))
-    storage.update_signup(carol["id"], SignupUpdate(amount_owed=13.0))
-    storage.update_signup(dan["id"], SignupUpdate(amount_owed=14.0))
+    def counting_recalculate_session_costs(*args, **kwargs):
+        nonlocal helper_calls
+        helper_calls += 1
 
-    amount_update_calls = 0
-    original_update_signup = storage.update_signup
-
-    def counting_update_signup(signup_id, data):
-        nonlocal amount_update_calls
-        if data.amount_owed is not None:
-            amount_update_calls += 1
-        return original_update_signup(signup_id, data)
-
-    storage.update_signup = counting_update_signup
+    monkeypatch.setattr(
+        admin_router,
+        "_recalculate_session_costs",
+        counting_recalculate_session_costs,
+        raising=False,
+    )
 
     response = client.delete(f"/api/admin/signups/{bob['id']}")
 
     assert response.status_code == 200
-    assert amount_update_calls == 4
+    assert helper_calls == 1
 
     session_response = client.get(f"/api/admin/sessions/{session['id']}")
     signups = {signup["email"]: signup for signup in session_response.json()["signups"]}

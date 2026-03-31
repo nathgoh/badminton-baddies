@@ -85,14 +85,14 @@ def test_calculate_costs_all_adjusted_valid_total_leaves_existing_amounts_unchan
     s1 = storage.create_signup(SignupCreate(session_id=session_id, email="a@x.com", name="A", payment_agreed=True))
     s2 = storage.create_signup(SignupCreate(session_id=session_id, email="b@x.com", name="B", payment_agreed=True))
     storage.update_signup(s1.id, SignupUpdate(amount_owed=20.0, amount_adjusted=True))
-    storage.update_signup(s2.id, SignupUpdate(amount_owed=5.0, amount_adjusted=True))
+    storage.update_signup(s2.id, SignupUpdate(amount_owed=10.0, amount_adjusted=True))
 
     response = client.post(f"/api/admin/sessions/{session_id}/calculate-costs")
 
     assert response.status_code == 200
     assert response.json()["base_amount"] == 0.0
     assert storage._signups[s1.id].amount_owed == 20.0
-    assert storage._signups[s2.id].amount_owed == 5.0
+    assert storage._signups[s2.id].amount_owed == 10.0
 
 
 def test_calculate_costs_rejects_adjusted_total_above_session_total(client: TestClient, storage: InMemoryAdapter):
