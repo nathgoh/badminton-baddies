@@ -155,10 +155,12 @@ export default function AdminSessionDetail() {
                     <span>Total court cost</span>
                     <strong className="text-base text-ink-950">${data.total_cost.toFixed(2)}</strong>
                   </div>
-                  {result ? (
+                  {data.confirmed_count > 0 ? (
                     <div className="flex items-center justify-between gap-3 rounded-[1.25rem] bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      <span>Base per player</span>
-                      <strong className="text-base">${result.base_amount.toFixed(2)}</strong>
+                      <span>Cost per player</span>
+                      <strong className="text-base">
+                        ${(result?.base_amount ?? data.total_cost / data.confirmed_count).toFixed(2)}
+                      </strong>
                     </div>
                   ) : null}
                 </div>
