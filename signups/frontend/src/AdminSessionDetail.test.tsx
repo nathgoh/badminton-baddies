@@ -10,9 +10,11 @@ describe('AdminSessionDetail structure hooks', () => {
 
   it('preserves the session controls and refresh workflow markers', () => {
     expect(AdminSessionDetailSource).toContain('handleToggleActive')
-    expect(AdminSessionDetailSource).toContain('CostCalculator')
-    expect(AdminSessionDetailSource).toContain('RosterManager')
-    expect(AdminSessionDetailSource).toContain('onRefresh={() => void load()}')
+    expect(AdminSessionDetailSource).toContain('await updateSession(')
+    expect(AdminSessionDetailSource).toContain('await load()')
+    expect(AdminSessionDetailSource).toContain('function handleRefresh()')
+    expect(AdminSessionDetailSource).toContain('CostCalculator data={data} onRefresh={handleRefresh}')
+    expect(AdminSessionDetailSource).toContain('RosterManager signups={data.signups} onRefresh={handleRefresh}')
     expect(AdminSessionDetailSource).toContain('updateSession')
     expect(AdminSessionDetailSource).not.toContain('handleCalculate')
     expect(AdminSessionDetailSource).not.toContain('calculateCosts')

@@ -21,6 +21,10 @@ export default function AdminSessionDetail() {
     setData(await getAdminSession(id))
   }
 
+  function handleRefresh() {
+    void load()
+  }
+
   useEffect(() => {
     void load()
   }, [id])
@@ -30,7 +34,7 @@ export default function AdminSessionDetail() {
     setToggling(true)
     try {
       await updateSession(data.session.id, { is_active: !data.session.is_active })
-      void load()
+      await load()
     } catch (error) {
       alert(error instanceof Error ? error.message : String(error))
     } finally {
@@ -176,8 +180,8 @@ export default function AdminSessionDetail() {
           data-testid="admin-detail-grid"
           className="grid gap-4 xl:grid-cols-[minmax(0,0.98fr)_minmax(0,1.02fr)]"
         >
-          <CostCalculator data={data} onRefresh={() => void load()} />
-          <RosterManager signups={data.signups} onRefresh={() => void load()} />
+          <CostCalculator data={data} onRefresh={handleRefresh} />
+          <RosterManager signups={data.signups} onRefresh={handleRefresh} />
         </div>
       </div>
     </div>
