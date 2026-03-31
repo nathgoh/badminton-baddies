@@ -40,8 +40,8 @@ export default function AdminPlayers() {
       <div className="space-y-5">
         <section className="relative overflow-hidden rounded-[2rem] bg-ink-950 px-5 py-6 text-white shadow-soft sm:px-8 sm:py-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.18),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(245,158,11,0.2),_transparent_30%)]" />
-          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl space-y-3">
+          <div className="relative flex items-start justify-between gap-5">
+            <div className="min-w-0 space-y-3">
               <button
                 className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/15"
                 onClick={() => navigate('/admin')}
@@ -62,7 +62,7 @@ export default function AdminPlayers() {
               </div>
             </div>
 
-            <Card className="max-w-sm border-white/15 bg-white/10 text-white backdrop-blur-sm">
+            <Card className="shrink-0 border-white/15 bg-white/10 text-white backdrop-blur-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-200">
                 Records
               </p>
