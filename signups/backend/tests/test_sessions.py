@@ -202,6 +202,69 @@ def test_delete_court_recalculates_costs_for_confirmed_signups(client):
     }
 
 
+def test_update_court_does_not_persist_when_recalculation_would_fail(client):
+    session = _create_session(client, is_active=True)
+    session_id = session["id"]
+    token = session["access_token"]
+    court_id = _create_court(client, session_id, total_cost=20.0, max_players=4).json()["id"]
+    _create_court(client, session_id, total_cost=10.0, max_players=2)
+    alice = _signup(client, token, "a@t.com", "Alice").json()
+    bob = _signup(client, token, "b@t.com", "Bob").json()
+
+    response_a = client.patch(
+        f"/api/admin/signups/{alice['id']}",
+        json={"amount_owed": 20.0, "amount_adjusted": True},
+    )
+    response_b = client.patch(
+        f"/api/admin/signups/{bob['id']}",
+        json={"amount_owed": 10.0, "amount_adjusted": True},
+    )
+    assert response_a.status_code == 200
+    assert response_b.status_code == 200
+
+    response = client.patch(f"/api/courts/{court_id}", json={"total_cost": 5.0})
+
+    assert response.status_code == 400
+    admin_response = client.get(f"/api/admin/sessions/{session_id}")
+    assert admin_response.json()["total_cost"] == 30.0
+    assert _amounts_by_email(client, session_id) == {
+        "a@t.com": 20.0,
+        "b@t.com": 10.0,
+    }
+
+
+def test_delete_court_does_not_persist_when_recalculation_would_fail(client):
+    session = _create_session(client, is_active=True)
+    session_id = session["id"]
+    token = session["access_token"]
+    _create_court(client, session_id, total_cost=20.0, max_players=4)
+    extra_court_id = _create_court(client, session_id, total_cost=10.0, max_players=2).json()["id"]
+    alice = _signup(client, token, "a@t.com", "Alice").json()
+    bob = _signup(client, token, "b@t.com", "Bob").json()
+
+    response_a = client.patch(
+        f"/api/admin/signups/{alice['id']}",
+        json={"amount_owed": 20.0, "amount_adjusted": True},
+    )
+    response_b = client.patch(
+        f"/api/admin/signups/{bob['id']}",
+        json={"amount_owed": 10.0, "amount_adjusted": True},
+    )
+    assert response_a.status_code == 200
+    assert response_b.status_code == 200
+
+    response = client.delete(f"/api/courts/{extra_court_id}")
+
+    assert response.status_code == 400
+    admin_response = client.get(f"/api/admin/sessions/{session_id}")
+    assert admin_response.json()["total_cost"] == 30.0
+    assert len(admin_response.json()["courts"]) == 2
+    assert _amounts_by_email(client, session_id) == {
+        "a@t.com": 20.0,
+        "b@t.com": 10.0,
+    }
+
+
 def test_create_court_with_no_confirmed_signups_does_not_error(client):
     session_id = _create_session(client, is_active=True)["id"]
 
