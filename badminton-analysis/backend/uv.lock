@@ -259,7 +259,7 @@ requires-dist = [
     { name = "opencv-python-headless", specifier = ">=4.11.0" },
     { name = "pydantic", specifier = ">=2.11.0" },
     { name = "pydantic-ai" },
-    { name = "ultralytics", specifier = ">=8.3.0" },
+    { name = "ultralytics", specifier = ">=8.4.32" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
 
@@ -289,6 +289,7 @@ dependencies = [
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/72/56/3909516140653c389214d01f15660fa76514a9a9e30da1cb9e894f01051e/boto3-1.42.79.tar.gz", hash = "sha256:286c4220785e4fbe46aaea04d005b0dcdd8aaf5b885d92b2609c934d794ec5d9", size = 112818, upload-time = "2026-03-30T19:44:40.497Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/c0/d018824c2859976753cc4b78c48e1be641cf734b7d84e455b0f7f9b9d66d/boto3-1.42.79-py3-none-any.whl", hash = "sha256:2336d744dfe9017d6b96b8e40fdd445295ca6a67f02f1c8c488edeb92c4b7918", size = 140555, upload-time = "2026-03-30T19:44:37.326Z" },
 ]
@@ -3867,7 +3868,7 @@ wheels = [
 
 [[package]]
 name = "ultralytics"
-version = "8.4.32"
+version = "8.4.33"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
@@ -3883,9 +3884,9 @@ dependencies = [
     { name = "torchvision" },
     { name = "ultralytics-thop" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/da/80/b17c01884a5c3997775d40786efc81d94b2204298a6d8ef3f6a6e308fced/ultralytics-8.4.32.tar.gz", hash = "sha256:ae9d3c3fa2930248a4a93e65fb47803cf58b440e36f541d103b308f3774d574e", size = 1028243, upload-time = "2026-03-30T16:11:28.574Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/09/75/b4bf2073c993293ddb3c9565e4c5281758b87b4f4bc5e546c688b99d2253/ultralytics-8.4.33.tar.gz", hash = "sha256:0f45846fea8cf70b8e332e31334b8c42eec35f649f57b9012fc81721f695339a", size = 1031335, upload-time = "2026-03-31T17:08:52.228Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e3/ee/7ba24da543b47971bf7e64c01e2f2b03ec25aec25cd3af0007922db35fe5/ultralytics-8.4.32-py3-none-any.whl", hash = "sha256:88093e6c311a1ea3dd3369481249fe202d4e8e946d24902b22c00850e2e29fae", size = 1219034, upload-time = "2026-03-30T16:11:24.343Z" },
+    { url = "https://files.pythonhosted.org/packages/04/f3/43138e1ee28392b0d11cb25a9b484a9111881f77c6588d8c822eaa2f7ae2/ultralytics-8.4.33-py3-none-any.whl", hash = "sha256:2e696bfa14b32c26c3172d80a7291b897bdf68e21ae45ea82c2d1ff96f536997", size = 1221957, upload-time = "2026-03-31T17:08:48.323Z" },
 ]
 
 [[package]]

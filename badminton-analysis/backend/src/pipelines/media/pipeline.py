@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 
 @dataclass(slots=True)
@@ -16,12 +18,32 @@ class PreparedMediaArtifacts:
     video_duration_seconds: float | None = None
 
 
+@dataclass(slots=True)
+class RenderedClipArtifact:
+    clip_id: str
+    path: str
+    media_type: str
+
+
 class MediaPreparationError(RuntimeError):
     pass
 
 
 class MediaArtifactPipeline(Protocol):
     def prepare_analysis(self, analysis_id: str, youtube_url: str) -> PreparedMediaArtifacts: ...
+
+    def render_report_clip(
+        self,
+        *,
+        analysis_id: str,
+        clip_id: str,
+        source_video_path: str,
+        clip_start_seconds: int,
+        clip_end_seconds: int,
+        annotate_frame: Callable[[Any, int], Any],
+    ) -> RenderedClipArtifact: ...
+
+    def get_rendered_clip_file(self, analysis_id: str, clip_id: str) -> tuple[Path, str]: ...
 
     def cleanup_analysis(self, analysis_id: str) -> None: ...
 
@@ -88,6 +110,31 @@ class MockMediaArtifactPipeline:
             source_url=youtube_url,
             video_duration_seconds=120.0,
         )
+
+    def render_report_clip(
+        self,
+        *,
+        analysis_id: str,
+        clip_id: str,
+        source_video_path: str,
+        clip_start_seconds: int,
+        clip_end_seconds: int,
+        annotate_frame: Callable[[Any, int], Any],
+    ) -> RenderedClipArtifact:
+        analysis_dir = self._artifact_root / analysis_id
+        analysis_dir.mkdir(parents=True, exist_ok=True)
+        clip_path = analysis_dir / f"{clip_id}.mp4"
+        clip_path.write_bytes(
+            f"clip:{Path(source_video_path).name}:{clip_start_seconds}:{clip_end_seconds}".encode()
+        )
+        return RenderedClipArtifact(
+            clip_id=clip_id,
+            path=str(clip_path),
+            media_type="video/mp4",
+        )
+
+    def get_rendered_clip_file(self, analysis_id: str, clip_id: str) -> tuple[Path, str]:
+        return self._artifact_root / analysis_id / f"{clip_id}.mp4", "video/mp4"
 
     def cleanup_analysis(self, analysis_id: str) -> None:
         shutil.rmtree(self._artifact_root / analysis_id, ignore_errors=True)
@@ -156,6 +203,65 @@ class ShellMediaArtifactPipeline:
             source_url=youtube_url,
             video_duration_seconds=duration,
         )
+
+    def render_report_clip(
+        self,
+        *,
+        analysis_id: str,
+        clip_id: str,
+        source_video_path: str,
+        clip_start_seconds: int,
+        clip_end_seconds: int,
+        annotate_frame: Callable[[Any, int], Any],
+    ) -> RenderedClipArtifact:
+        cv2: Any = import_module("cv2")
+        capture = cv2.VideoCapture(source_video_path)
+        if not capture.isOpened():
+            raise MediaPreparationError(f"Unable to open source video at {source_video_path}")
+
+        fps = capture.get(cv2.CAP_PROP_FPS) or 30.0
+        start_frame = max(0, int(clip_start_seconds * fps))
+        end_frame = max(start_frame + 1, int(clip_end_seconds * fps))
+        capture.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+
+        analysis_dir = self._artifact_root / analysis_id
+        analysis_dir.mkdir(parents=True, exist_ok=True)
+        clip_path = analysis_dir / f"{clip_id}.mp4"
+
+        writer = None
+        written_frames = 0
+        current_frame = start_frame
+        try:
+            while current_frame < end_frame:
+                ok, frame = capture.read()
+                if not ok:
+                    break
+                annotated = annotate_frame(frame.copy(), current_frame)
+                if writer is None:
+                    height, width = annotated.shape[:2]
+                    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+                    writer = cv2.VideoWriter(str(clip_path), fourcc, fps, (width, height))
+                    if not writer.isOpened():
+                        raise MediaPreparationError("Unable to open clip writer for mp4 output.")
+                writer.write(annotated)
+                written_frames += 1
+                current_frame += 1
+        finally:
+            capture.release()
+            if writer is not None:
+                writer.release()
+
+        if written_frames == 0 or not clip_path.exists():
+            raise MediaPreparationError("No frames were written for the requested clip window.")
+
+        return RenderedClipArtifact(
+            clip_id=clip_id,
+            path=str(clip_path),
+            media_type="video/mp4",
+        )
+
+    def get_rendered_clip_file(self, analysis_id: str, clip_id: str) -> tuple[Path, str]:
+        return self._artifact_root / analysis_id / f"{clip_id}.mp4", "video/mp4"
 
     def cleanup_analysis(self, analysis_id: str) -> None:
         shutil.rmtree(self._artifact_root / analysis_id, ignore_errors=True)

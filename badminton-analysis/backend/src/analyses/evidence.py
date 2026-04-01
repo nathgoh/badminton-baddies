@@ -103,6 +103,15 @@ def _build_shuttle_samples(
     return samples
 
 
+def _format_timestamp(seconds: float) -> str:
+    total = max(0, int(seconds))
+    minutes, seconds_part = divmod(total, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{seconds_part:02d}"
+    return f"{minutes:02d}:{seconds_part:02d}"
+
+
 def _build_gaussian_heatmap(samples: list[ShuttleSample]) -> list[HeatmapCell]:
     if not samples:
         return [HeatmapCell(zone=zone, weight=0.0) for zone in ZONE_CENTERS]
@@ -147,6 +156,15 @@ def _build_pressure_windows(
     if not samples:
         return []
 
+    use_sample_timestamps = any(sample.source == "observed" for sample in samples) or (
+        len(shot_selection.events) != len(samples)
+    )
+
+    def timestamp_for(index: int) -> str:
+        if not use_sample_timestamps and index < len(shot_selection.events):
+            return shot_selection.events[index].timestamp
+        return _format_timestamp(samples[index].timestamp_seconds)
+
     windows: list[PressureWindow] = []
     start_index = 0
     current_label = _pressure_label(samples[0].y)
@@ -156,27 +174,31 @@ def _build_pressure_windows(
         if next_label == current_label:
             continue
 
-        start_timestamp = shot_selection.events[start_index].timestamp
-        end_timestamp = shot_selection.events[index - 1].timestamp
+        start_timestamp = timestamp_for(start_index)
+        end_timestamp = timestamp_for(index - 1)
         windows.append(
             PressureWindow(
                 label=current_label,
                 start_timestamp=start_timestamp,
                 end_timestamp=end_timestamp,
                 summary=_pressure_summary(current_label, start_timestamp, end_timestamp),
+                clip_start_seconds=max(0, int(_parse_timestamp(start_timestamp)) - 2),
+                clip_end_seconds=int(_parse_timestamp(end_timestamp)) + 2,
             )
         )
         start_index = index
         current_label = next_label
 
-    start_timestamp = shot_selection.events[start_index].timestamp
-    end_timestamp = shot_selection.events[len(samples) - 1].timestamp
+    start_timestamp = timestamp_for(start_index)
+    end_timestamp = timestamp_for(len(samples) - 1)
     windows.append(
         PressureWindow(
             label=current_label,
             start_timestamp=start_timestamp,
             end_timestamp=end_timestamp,
             summary=_pressure_summary(current_label, start_timestamp, end_timestamp),
+            clip_start_seconds=max(0, int(_parse_timestamp(start_timestamp)) - 2),
+            clip_end_seconds=int(_parse_timestamp(end_timestamp)) + 2,
         )
     )
     return windows
@@ -186,8 +208,12 @@ def build_shuttle_metrics(
     shot_selection: ShotSelectionMetrics,
     *,
     tracking_summary: PlayerTrackSummary | None,
+    observed_samples: list[ShuttleSample] | None = None,
 ) -> ShuttleMetrics:
-    samples = _build_shuttle_samples(shot_selection, tracking_summary=tracking_summary)
+    samples = [
+        sample.model_copy(update={"source": "observed"})
+        for sample in (observed_samples or [])
+    ] or _build_shuttle_samples(shot_selection, tracking_summary=tracking_summary)
     heatmap = _build_gaussian_heatmap(samples)
     pressure_windows = _build_pressure_windows(shot_selection, samples)
     dominant_zone = max(
@@ -200,14 +226,25 @@ def build_shuttle_metrics(
         [window for window in pressure_windows if window.label == "Forecourt pressure"]
     )
 
-    summary = (
-        f"Gaussian-smoothed shuttle occupancy leaned most heavily toward the {dominant_label}, "
-        f"with {inferred_windows} inferred forecourt pressure window(s)."
-    )
-    uncertainty_note = (
-        "Shuttle positions are inferred from shot context and tracked-player movement, then "
-        "smoothed into zone density rather than directly observed frame by frame."
-    )
+    if any(sample.source == "observed" for sample in samples):
+        summary = (
+            f"Gaussian-smoothed shuttle occupancy leaned most heavily toward the "
+            f"{dominant_label}, with {inferred_windows} forecourt pressure window(s) from "
+            "direct observation."
+        )
+        uncertainty_note = (
+            "Shuttle positions were directly observed from motion-based samples where visible; "
+            "inferred fallback is used only when credible observation is unavailable."
+        )
+    else:
+        summary = (
+            f"Gaussian-smoothed shuttle occupancy leaned most heavily toward the "
+            f"{dominant_label}, with {inferred_windows} inferred forecourt pressure window(s)."
+        )
+        uncertainty_note = (
+            "Shuttle positions use inferred fallback from shot context and tracked-player "
+            "movement rather than direct frame-by-frame observation."
+        )
     return ShuttleMetrics(
         summary=summary,
         uncertainty_note=uncertainty_note,

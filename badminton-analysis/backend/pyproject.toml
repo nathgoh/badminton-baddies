@@ -12,7 +12,7 @@ dependencies = [
   "opencv-python-headless>=4.11.0",
   "pydantic-ai",
   "pydantic>=2.11.0",
-  "ultralytics>=8.3.0",
+  "ultralytics>=8.4.32",
   "uvicorn>=0.35.0",
 ]
 

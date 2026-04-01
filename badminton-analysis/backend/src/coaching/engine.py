@@ -104,7 +104,7 @@ class PlaceholderCoachFeedbackEngine:
 
 
 def _resolve_model_string(*, provider: str, model: str) -> str:
-    """Build a PydanticAI model string like 'google-gla:gemini-3-flash-preview'."""
+    """Build a PydanticAI model string like 'google-gla:gemini-3.1-flash-lite-preview'."""
     if ":" in model:
         return model
     if provider == "gemini":
@@ -117,7 +117,7 @@ class LLMCoachFeedbackEngine:
         self,
         *,
         provider: str = "gemini",
-        model: str = "gemini-3-flash-preview",
+        model: str = "gemini-3.1-flash-lite-preview",
         instructions: str | None = None,
         model_override: Model | None = None,
     ) -> None:
@@ -197,6 +197,6 @@ def build_coach_feedback_engine_from_env(
     if engine_name in ("llm", "pydanticai"):
         return LLMCoachFeedbackEngine(
             provider=provider or "gemini",
-            model=model or "gemini-3-flash-preview",
+            model=model or "gemini-3.1-flash-lite-preview",
         )
     return PlaceholderCoachFeedbackEngine()

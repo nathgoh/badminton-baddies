@@ -118,6 +118,20 @@ def get_setup_frame(
     return FileResponse(path, media_type=media_type)
 
 
+@app.get("/api/analyses/{analysis_id}/clips/{clip_id}")
+def get_rendered_clip(
+    analysis_id: str,
+    clip_id: str,
+    owner_id: str | None = Header(default=None, alias="X-Owner-Id"),
+) -> FileResponse:
+    path, media_type = service.get_rendered_clip_file(
+        analysis_id,
+        clip_id,
+        owner_id=owner_id,
+    )
+    return FileResponse(path, media_type=media_type)
+
+
 @app.post(
     "/api/analyses/{analysis_id}/selection",
     response_model=AnalysisActionResponse,

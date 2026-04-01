@@ -27,6 +27,8 @@ import type {
   HeatmapCell,
   MatchType,
   PlayerCandidate,
+  PressureWindow,
+  ReportClipSelection,
   ShotSelectionEvent,
 } from "./types";
 
@@ -54,12 +56,34 @@ function parseTimestamp(ts: string): number {
   return 0;
 }
 
-/** Build a YouTube URL that starts at the given "MM:SS" timestamp. */
-function youtubeTimestampUrl(baseUrl: string, timestamp: string): string {
-  const seconds = parseTimestamp(timestamp);
-  const url = new URL(baseUrl);
-  url.searchParams.set("t", String(seconds));
-  return url.toString();
+function extractYouTubeVideoId(baseUrl: string): string | null {
+  try {
+    const url = new URL(baseUrl);
+    if (url.hostname === "youtu.be") {
+      return url.pathname.slice(1) || null;
+    }
+    if (url.pathname.startsWith("/embed/")) {
+      return url.pathname.split("/")[2] || null;
+    }
+    return url.searchParams.get("v");
+  } catch {
+    return null;
+  }
+}
+
+function youtubeEmbedUrl(baseUrl: string, startSeconds: number, endSeconds: number): string | null {
+  const videoId = extractYouTubeVideoId(baseUrl);
+  if (!videoId) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    autoplay: "1",
+    rel: "0",
+    start: String(Math.max(0, startSeconds)),
+    end: String(Math.max(startSeconds + 1, endSeconds)),
+  });
+  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
 }
 
 /** Map heatmap zone name (e.g. "front-left") to a grid position. */
@@ -140,10 +164,10 @@ function CourtHeatmap({ cells }: { cells: HeatmapCell[] }) {
 
 function ShotEventCard({
   event,
-  youtubeUrl,
+  onLoadClip,
 }: {
   event: ShotSelectionEvent;
-  youtubeUrl: string;
+  onLoadClip: (event: ShotSelectionEvent) => void;
 }) {
   const qualityColor =
     event.decision_quality === "strong"
@@ -155,19 +179,24 @@ function ShotEventCard({
   return (
     <article className="p-4 border border-slate-200 rounded-xl bg-slate-50">
       <div className="flex flex-col gap-1 mb-2">
-        <div className="flex items-center gap-2">
-          <a
-            href={youtubeTimestampUrl(youtubeUrl, event.timestamp)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-sm font-semibold text-blue-600">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z" />
+              </svg>
+              {event.timestamp}
+            </span>
+            <span className="text-sm text-slate-800 font-medium">{event.shot_type}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onLoadClip(event)}
+            aria-label={`Load clip for ${event.timestamp} ${event.shot_type}`}
+            className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-50"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.09L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.09L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z" />
-            </svg>
-            {event.timestamp}
-          </a>
-          <span className="text-sm text-slate-800 font-medium">{event.shot_type}</span>
+            Load clip
+          </button>
         </div>
         <span className="text-xs text-slate-500">
           Execution {event.execution_score} / Decision {event.decision_score}
@@ -197,6 +226,8 @@ function formatPipelineStage(stage: string | null | undefined): string {
       return "Player Tracking";
     case "pose":
       return "Pose Estimation";
+    case "shot_analysis":
+      return "Shot Analysis";
     case "analytics":
       return "Analytics";
     case "coaching":
@@ -218,10 +249,17 @@ function App() {
   const [status, setStatus] = useState<AnalysisStatusResponse | null>(null);
   const [latestFrame, setLatestFrame] = useState<FrameEvent | null>(null);
   const [report, setReport] = useState<AnalysisReport | null>(null);
+  const [selectedClip, setSelectedClip] = useState<ReportClipSelection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [draggingCorner, setDraggingCorner] = useState<number | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
+  const reportYoutubeUrl = analysis?.youtube_url ?? youtubeUrl;
+  const activeRenderedClipUrl = selectedClip?.renderedClipUrl ?? null;
+  const activeYoutubeClipUrl =
+    selectedClip === null || activeRenderedClipUrl !== null
+      ? null
+      : youtubeEmbedUrl(reportYoutubeUrl, selectedClip.startSeconds, selectedClip.endSeconds);
 
   useEffect(() => {
     const analysisId = analysis?.analysis_id;
@@ -244,12 +282,13 @@ function App() {
           const nextReport = await fetchReport(stableAnalysisId);
           if (cancelled) return;
 
-          startTransition(() => {
-            setStatus(nextStatus);
-            setLatestFrame(null);
-            setReport(nextReport);
-            setScreen("report");
-          });
+            startTransition(() => {
+              setStatus(nextStatus);
+              setLatestFrame(null);
+              setReport(nextReport);
+              setSelectedClip(null);
+              setScreen("report");
+            });
           return;
         }
 
@@ -314,6 +353,7 @@ function App() {
               setStatus(finalStatus);
               setLatestFrame(null);
               setReport(nextReport);
+              setSelectedClip(null);
               setScreen("report");
             });
             return;
@@ -365,6 +405,7 @@ function App() {
       setStatus(null);
       setLatestFrame(null);
       setReport(null);
+      setSelectedClip(null);
       setError(null);
       setReportTab("coach");
     });
@@ -390,6 +431,7 @@ function App() {
         setStatus(null);
         setLatestFrame(null);
         setReport(null);
+        setSelectedClip(null);
         setReportTab("coach");
         setScreen("setup");
       });
@@ -430,6 +472,7 @@ function App() {
           total_frames: null,
         });
         setLatestFrame(null);
+        setSelectedClip(null);
         setScreen("processing");
       });
     } catch (runError) {
@@ -476,6 +519,28 @@ function App() {
 
   function stopDragging() {
     setDraggingCorner(null);
+  }
+
+  function loadShotClip(event: ShotSelectionEvent) {
+    setSelectedClip({
+      title: `${event.timestamp} ${event.shot_type}`,
+      startSeconds: event.clip_start_seconds,
+      endSeconds: event.clip_end_seconds,
+      assetLabel: event.rendered_clip_url ? "Annotated clip" : "YouTube fallback",
+      renderedClipUrl: event.rendered_clip_url ?? null,
+      renderedClipMediaType: event.rendered_clip_media_type ?? null,
+    });
+  }
+
+  function loadPressureWindowClip(window: PressureWindow) {
+    setSelectedClip({
+      title: window.label,
+      startSeconds: window.clip_start_seconds ?? parseTimestamp(window.start_timestamp),
+      endSeconds: window.clip_end_seconds ?? parseTimestamp(window.end_timestamp),
+      assetLabel: window.rendered_clip_url ? "Annotated clip" : "YouTube fallback",
+      renderedClipUrl: window.rendered_clip_url ?? null,
+      renderedClipMediaType: window.rendered_clip_media_type ?? null,
+    });
   }
 
   const stageLabels: Screen[] = ["analyze", "setup", "processing", "report"];
@@ -1055,12 +1120,50 @@ function App() {
                     <p className="mt-2 text-sm text-slate-600">
                       {report.analytics_view.shot_selection.overview}
                     </p>
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-950 p-4 text-slate-100">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <p className="text-xs font-semibold tracking-widest uppercase text-sky-300">
+                            Clip viewer
+                          </p>
+                          <p className="mt-1 text-sm text-slate-300">
+                            {selectedClip
+                              ? `${selectedClip.assetLabel} • ${selectedClip.title} • ${selectedClip.startSeconds}s-${selectedClip.endSeconds}s`
+                              : "Load a shot or shuttle clip to preview it here."}
+                          </p>
+                        </div>
+                      </div>
+                      {activeRenderedClipUrl ? (
+                        <div className="mt-4 overflow-hidden rounded-xl border border-slate-800 bg-black">
+                          <video
+                            title="Annotated report clip"
+                            src={activeRenderedClipUrl}
+                            className="aspect-video w-full"
+                            controls
+                          />
+                        </div>
+                      ) : activeYoutubeClipUrl ? (
+                        <div className="mt-4 overflow-hidden rounded-xl border border-slate-800 bg-black">
+                          <iframe
+                            title="Report clip player"
+                            src={activeYoutubeClipUrl}
+                            className="aspect-video w-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                      ) : (
+                        <div className="mt-4 rounded-xl border border-dashed border-slate-700 bg-slate-900/70 px-4 py-6 text-sm text-slate-400">
+                          Choose a shot event or shuttle pressure window below to load the shared YouTube clip.
+                        </div>
+                      )}
+                    </div>
                     <div className="grid gap-3 mt-4">
                       {report.analytics_view.shot_selection.events.map((event) => (
                         <ShotEventCard
                           key={`${event.timestamp}-${event.shot_type}`}
                           event={event}
-                          youtubeUrl={youtubeUrl}
+                          onLoadClip={loadShotClip}
                         />
                       ))}
                     </div>
@@ -1088,10 +1191,21 @@ function App() {
                           className="p-3 border border-slate-200 rounded-lg bg-slate-50"
                           key={`${window.label}-${window.start_timestamp}-${window.end_timestamp}`}
                         >
-                          <strong className="text-sm text-slate-700">{window.label}</strong>
-                          <span className="block mt-1 text-xs text-blue-600 font-semibold">
-                            {window.start_timestamp} - {window.end_timestamp}
-                          </span>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <strong className="text-sm text-slate-700">{window.label}</strong>
+                              <span className="block mt-1 text-xs text-blue-600 font-semibold">
+                                {window.start_timestamp} - {window.end_timestamp}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => loadPressureWindowClip(window)}
+                              className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-50"
+                            >
+                              Load clip
+                            </button>
+                          </div>
                           <p className="mt-1 text-xs text-slate-500">{window.summary}</p>
                         </article>
                       ))}

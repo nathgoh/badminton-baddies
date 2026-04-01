@@ -14,6 +14,9 @@ from .analysis import (
 from .coaching import AIRationale, CoachFeedbackResult, CoachView
 from .cv import (
     PlayerTrackSummary,
+    PoseFrame,
+    PoseLandmarkPoint,
+    PoseMechanicsMetrics,
     PoseSummary,
     SetupDetectionResult,
     TrackingResult,
@@ -64,6 +67,9 @@ __all__ = [
     "MovementMetrics",
     "PlayerCandidate",
     "PlayerTrackSummary",
+    "PoseFrame",
+    "PoseLandmarkPoint",
+    "PoseMechanicsMetrics",
     "PoseSummary",
     "PositioningMetrics",
     "PressureWindow",

@@ -83,7 +83,9 @@ class FailingCoachFeedbackEngine:
 
 
 class FailingPipelineAnalysisService(AnalysisService):
-    def _build_analytics(self, match_type: MatchType, video_duration_seconds: float | None = None):  # type: ignore[override]
+    def _build_analytics(  # type: ignore[override]
+        self, match_type: MatchType, video_duration_seconds: float | None = None, **kwargs,
+    ):
         raise RuntimeError(f"pipeline exploded for {match_type.value}")
 
 
@@ -110,10 +112,51 @@ class FakeMediaArtifactPipeline:
             source_url=str(youtube_url),
         )
 
+    def render_report_clip(
+        self,
+        *,
+        analysis_id: str,
+        clip_id: str,
+        source_video_path: str,
+        clip_start_seconds: int,
+        clip_end_seconds: int,
+        annotate_frame,
+    ) -> SimpleNamespace:
+        analysis_dir = self._root / analysis_id
+        analysis_dir.mkdir(parents=True, exist_ok=True)
+        clip_path = analysis_dir / f"{clip_id}.mp4"
+        clip_path.write_bytes(
+            (
+                f"clip:{Path(source_video_path).name}:{clip_start_seconds}:{clip_end_seconds}"
+            ).encode()
+        )
+        return SimpleNamespace(
+            clip_id=clip_id,
+            path=str(clip_path),
+            media_type="video/mp4",
+        )
+
+    def get_rendered_clip_file(self, analysis_id: str, clip_id: str) -> tuple[Path, str]:
+        return self._root / analysis_id / f"{clip_id}.mp4", "video/mp4"
+
 
 class FailingMediaArtifactPipeline:
     def prepare_analysis(self, analysis_id: str, youtube_url: str) -> SimpleNamespace:
         raise RuntimeError(f"unable to prepare media for {youtube_url}")
+
+
+class FailingRenderedClipMediaArtifactPipeline(FakeMediaArtifactPipeline):
+    def render_report_clip(
+        self,
+        *,
+        analysis_id: str,
+        clip_id: str,
+        source_video_path: str,
+        clip_start_seconds: int,
+        clip_end_seconds: int,
+        annotate_frame,
+    ) -> SimpleNamespace:
+        raise RuntimeError(f"unable to render clip {clip_id}")
 
 
 class FakeCVPipeline:
@@ -125,12 +168,14 @@ class FakeCVPipeline:
                     label="Detected Player A",
                     side="near",
                     focus_hint="Highest-confidence detected player",
+                    bounding_box={"x": 0.18, "y": 0.56, "width": 0.12, "height": 0.23},
                 ),
                 PlayerCandidate(
                     player_id="detected-player-2",
                     label="Detected Player B",
                     side="far",
                     focus_hint="Secondary detected player",
+                    bounding_box={"x": 0.62, "y": 0.28, "width": 0.11, "height": 0.22},
                 ),
             ],
             court=CourtModel(
@@ -152,6 +197,7 @@ class FakeCVPipeline:
         court: CourtModel,
         match_type: MatchType,
         *,
+        selected_player: PlayerCandidate | None = None,
         on_frame=None,
     ) -> SimpleNamespace:
         tracks = {
@@ -174,6 +220,7 @@ class FakeCVPipeline:
         }
         return SimpleNamespace(
             tracks=tracks,
+            focused_track_id=None,
             warnings=[],
         )
 
@@ -202,6 +249,7 @@ class StreamingFakeCVPipeline(FakeCVPipeline):
         court: CourtModel,
         match_type: MatchType,
         *,
+        selected_player: PlayerCandidate | None = None,
         on_frame=None,
     ) -> SimpleNamespace:
         if on_frame is not None:
@@ -213,6 +261,7 @@ class StreamingFakeCVPipeline(FakeCVPipeline):
             video_path,
             court,
             match_type,
+            selected_player=selected_player,
             on_frame=on_frame,
         )
 
@@ -230,6 +279,133 @@ class StreamingFakeCVPipeline(FakeCVPipeline):
             video_path,
             selected_track,
             on_frame=on_frame,
+        )
+
+
+class FocusedTrackFakeCVPipeline(FakeCVPipeline):
+    def track_players(
+        self,
+        video_path: str,
+        court: CourtModel,
+        match_type: MatchType,
+        *,
+        selected_player: PlayerCandidate | None = None,
+        on_frame=None,
+    ) -> SimpleNamespace:
+        assert selected_player is not None
+        return SimpleNamespace(
+            tracks=[
+                SimpleNamespace(
+                    track_id="track-selected",
+                    source_player_id=None,
+                    total_distance_meters=31.6,
+                    recovery_score=73,
+                    court_coverage_percent=79,
+                    change_of_direction_count=21,
+                    burst_count=5,
+                    directional_balance={"left": 0.52, "right": 0.48},
+                    zone_occupancy={"front": 24, "mid": 43, "rear": 33},
+                    heatmap=[
+                        {"zone": "front-left", "weight": 0.12},
+                        {"zone": "mid-centre", "weight": 0.28},
+                    ],
+                    samples=[
+                        {"frame_index": 0, "timestamp_seconds": 0.0, "x": 0.63, "y": 0.34},
+                        {"frame_index": 12, "timestamp_seconds": 0.4, "x": 0.67, "y": 0.3},
+                    ],
+                ),
+                SimpleNamespace(
+                    track_id="track-bystander",
+                    source_player_id=None,
+                    total_distance_meters=4.9,
+                    recovery_score=41,
+                    court_coverage_percent=22,
+                    change_of_direction_count=3,
+                    burst_count=1,
+                    directional_balance={"left": 0.5, "right": 0.5},
+                    zone_occupancy={"front": 5, "mid": 8, "rear": 87},
+                    heatmap=[
+                        {"zone": "rear-right", "weight": 0.61},
+                    ],
+                    samples=[
+                        {"frame_index": 0, "timestamp_seconds": 0.0, "x": 0.24, "y": 0.7},
+                        {"frame_index": 12, "timestamp_seconds": 0.4, "x": 0.27, "y": 0.66},
+                    ],
+                ),
+            ],
+            focused_track_id="track-selected",
+            observed_shuttle_samples=[
+                {
+                    "timestamp_seconds": 1.0,
+                    "x": 0.48,
+                    "y": 0.22,
+                    "confidence": 0.91,
+                    "source": "observed",
+                },
+                {
+                    "timestamp_seconds": 1.2,
+                    "x": 0.51,
+                    "y": 0.27,
+                    "confidence": 0.88,
+                    "source": "observed",
+                },
+            ],
+            warnings=[],
+        )
+
+
+class UnfocusedTrackFakeCVPipeline(FakeCVPipeline):
+    def track_players(
+        self,
+        video_path: str,
+        court: CourtModel,
+        match_type: MatchType,
+        *,
+        selected_player: PlayerCandidate | None = None,
+        on_frame=None,
+    ) -> SimpleNamespace:
+        assert selected_player is not None
+        return SimpleNamespace(
+            tracks=[
+                SimpleNamespace(
+                    track_id="track-nearby-bystander",
+                    source_player_id=None,
+                    total_distance_meters=4.9,
+                    recovery_score=41,
+                    court_coverage_percent=22,
+                    change_of_direction_count=3,
+                    burst_count=1,
+                    directional_balance={"left": 0.5, "right": 0.5},
+                    zone_occupancy={"front": 5, "mid": 8, "rear": 87},
+                    heatmap=[
+                        {"zone": "rear-right", "weight": 0.61},
+                    ],
+                    samples=[
+                        {"frame_index": 0, "timestamp_seconds": 0.0, "x": 0.3, "y": 0.68},
+                        {"frame_index": 12, "timestamp_seconds": 0.4, "x": 0.33, "y": 0.64},
+                    ],
+                ),
+                SimpleNamespace(
+                    track_id="track-far-bystander",
+                    source_player_id=None,
+                    total_distance_meters=6.2,
+                    recovery_score=47,
+                    court_coverage_percent=18,
+                    change_of_direction_count=2,
+                    burst_count=1,
+                    directional_balance={"left": 0.3, "right": 0.7},
+                    zone_occupancy={"front": 3, "mid": 9, "rear": 88},
+                    heatmap=[
+                        {"zone": "rear-left", "weight": 0.54},
+                    ],
+                    samples=[
+                        {"frame_index": 0, "timestamp_seconds": 0.0, "x": 0.72, "y": 0.2},
+                        {"frame_index": 12, "timestamp_seconds": 0.4, "x": 0.75, "y": 0.22},
+                    ],
+                ),
+            ],
+            focused_track_id=None,
+            warnings=[],
         )
 
 
@@ -537,6 +713,217 @@ def test_run_analysis_uses_cv_tracking_and_pose_signals_in_analytics(client: Tes
     )
 
 
+def test_run_analysis_uses_focused_track_for_selected_player(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        main_module,
+        "service",
+        AnalysisService(
+            store=AnalysisStore(),
+            media_artifact_pipeline=FakeMediaArtifactPipeline(tmp_path),
+            cv_pipeline=FocusedTrackFakeCVPipeline(),
+        ),
+    )
+    with TestClient(main_module.app) as client:
+        analysis_id, _ = _ready_analysis(client, match_type="mens_singles")
+
+        run_response = client.post(f"/api/analyses/{analysis_id}/run")
+
+        assert run_response.status_code == 202
+
+        statuses = _poll_until_terminal(client, analysis_id)
+        assert statuses[-1]["stage"] == "completed"
+
+        report = client.get(f"/api/analyses/{analysis_id}/report").json()
+
+    assert report["analytics_view"]["movement"]["total_distance_meters"] == 31.6
+    assert report["analytics_view"]["movement"]["recovery_score"] == 73
+
+
+def test_observed_shuttle_samples_raise_heatmap_confidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        main_module,
+        "service",
+        AnalysisService(
+            store=AnalysisStore(),
+            media_artifact_pipeline=FakeMediaArtifactPipeline(tmp_path),
+            cv_pipeline=FocusedTrackFakeCVPipeline(),
+        ),
+    )
+    with TestClient(main_module.app) as client:
+        analysis_id, _ = _ready_analysis(client, match_type="mens_singles")
+
+        run_response = client.post(f"/api/analyses/{analysis_id}/run")
+
+        assert run_response.status_code == 202
+
+        _poll_until_terminal(client, analysis_id)
+        report = client.get(f"/api/analyses/{analysis_id}/report").json()
+
+    shuttle_annotation = next(
+        annotation
+        for annotation in report["confidence_annotations"]
+        if annotation["field"] == "analytics.shuttle.heatmap"
+    )
+
+    assert shuttle_annotation["confidence"] > 0.8
+    assert "direct" in shuttle_annotation["reason"].lower()
+
+
+def test_run_analysis_fails_closed_when_selected_player_cannot_be_mapped_to_track(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        main_module,
+        "service",
+        AnalysisService(
+            store=AnalysisStore(),
+            media_artifact_pipeline=FakeMediaArtifactPipeline(tmp_path),
+            cv_pipeline=UnfocusedTrackFakeCVPipeline(),
+        ),
+    )
+    with TestClient(main_module.app) as client:
+        analysis_id, _ = _ready_analysis(client, match_type="mens_singles")
+
+        run_response = client.post(f"/api/analyses/{analysis_id}/run")
+
+        assert run_response.status_code == 202
+
+        statuses = _poll_until_terminal(client, analysis_id)
+
+    assert statuses[-1]["stage"] == "failed"
+    assert statuses[-1]["error_details"] == (
+        "Unable to map the selected player to a tracked sequence."
+    )
+
+
+def test_mock_pipeline_supports_selecting_non_primary_player(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from pipelines.cv.pipeline import MockCVPipeline
+    from pipelines.media.pipeline import MockMediaArtifactPipeline
+
+    monkeypatch.setattr(
+        main_module,
+        "service",
+        AnalysisService(
+            store=AnalysisStore(),
+            media_artifact_pipeline=MockMediaArtifactPipeline(tmp_path),
+            cv_pipeline=MockCVPipeline(),
+        ),
+    )
+    with TestClient(main_module.app) as client:
+        analysis_id = _create_analysis(client, match_type="mens_singles")
+        setup_response = client.get(f"/api/analyses/{analysis_id}/setup")
+        assert setup_response.status_code == 200
+        setup_payload = setup_response.json()
+        assert len(setup_payload["players"]) == 2
+
+        selection_response = client.post(
+            f"/api/analyses/{analysis_id}/selection",
+            json={
+                "player_id": setup_payload["players"][1]["player_id"],
+                "court_points": setup_payload["court"]["points"],
+            },
+        )
+        assert selection_response.status_code == 202
+
+        run_response = client.post(f"/api/analyses/{analysis_id}/run")
+        statuses = _poll_until_terminal(client, analysis_id)
+
+    assert run_response.status_code == 202
+    assert statuses[-1]["stage"] == "completed"
+
+
+def test_report_events_include_clip_windows(client: TestClient) -> None:
+    analysis_id, _ = _ready_analysis(client)
+
+    client.post(f"/api/analyses/{analysis_id}/run")
+    _poll_until_terminal(client, analysis_id)
+
+    report = client.get(f"/api/analyses/{analysis_id}/report").json()
+    event = report["analytics_view"]["shot_selection"]["events"][0]
+    pressure_window = report["analytics_view"]["shuttle"]["pressure_windows"][0]
+
+    assert event["clip_start_seconds"] < event["clip_end_seconds"]
+    assert event["clip_start_seconds"] >= 0
+    assert pressure_window["clip_start_seconds"] < pressure_window["clip_end_seconds"]
+    assert pressure_window["clip_start_seconds"] >= 0
+
+
+def test_report_events_include_rendered_clip_metadata(client: TestClient) -> None:
+    analysis_id, _ = _ready_analysis(client)
+
+    client.post(f"/api/analyses/{analysis_id}/run")
+    _poll_until_terminal(client, analysis_id)
+
+    report = client.get(f"/api/analyses/{analysis_id}/report").json()
+    event = report["analytics_view"]["shot_selection"]["events"][0]
+    pressure_window = report["analysis_evidence"]["shuttle"]["pressure_windows"][0]
+
+    assert event["rendered_clip_url"] == f"/api/analyses/{analysis_id}/clips/shot-00-06-smash"
+    assert event["rendered_clip_media_type"] == "video/mp4"
+    assert pressure_window["rendered_clip_url"] is not None
+    assert pressure_window["rendered_clip_media_type"] == "video/mp4"
+
+
+def test_report_clip_file_is_served_when_rendered(client: TestClient) -> None:
+    analysis_id, _ = _ready_analysis(client)
+
+    client.post(f"/api/analyses/{analysis_id}/run")
+    _poll_until_terminal(client, analysis_id)
+
+    report = client.get(f"/api/analyses/{analysis_id}/report").json()
+    clip_url = report["analytics_view"]["shot_selection"]["events"][0]["rendered_clip_url"]
+
+    clip_response = client.get(clip_url)
+
+    assert clip_response.status_code == 200
+    assert clip_response.headers["content-type"] == "video/mp4"
+    assert clip_response.content.startswith(b"clip:source.mp4:")
+
+
+def test_rendered_clip_failures_leave_report_usable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        main_module,
+        "service",
+        AnalysisService(
+            store=AnalysisStore(),
+            media_artifact_pipeline=FailingRenderedClipMediaArtifactPipeline(tmp_path),
+            cv_pipeline=FakeCVPipeline(),
+        ),
+    )
+    with TestClient(main_module.app) as client:
+        analysis_id, _ = _ready_analysis(client)
+
+        client.post(f"/api/analyses/{analysis_id}/run")
+        statuses = _poll_until_terminal(client, analysis_id)
+        report = client.get(f"/api/analyses/{analysis_id}/report").json()
+
+    event = report["analytics_view"]["shot_selection"]["events"][0]
+    pressure_window = report["analysis_evidence"]["shuttle"]["pressure_windows"][0]
+
+    assert statuses[-1]["stage"] == "completed"
+    assert event["rendered_clip_url"] is None
+    assert event["rendered_clip_media_type"] is None
+    assert pressure_window["rendered_clip_url"] is None
+    assert pressure_window["rendered_clip_media_type"] is None
+    assert any(
+        "Annotated clip fallback applied after unable to render clip" in item
+        for item in statuses[-1]["warnings"]
+    )
+
+
 def test_doubles_and_mixed_doubles_use_match_aware_positioning_without_role_advice(
     client: TestClient,
 ) -> None:
@@ -716,7 +1103,7 @@ def test_owner_header_populates_records_and_hides_other_owners(client: TestClien
     assert unauthorized_setup.json()["detail"] == "Analysis not found."
 
 
-def test_build_coach_feedback_engine_defaults_to_gemini_flash() -> None:
+def test_build_coach_feedback_engine_defaults_to_gemini_flash_lite_preview() -> None:
     engine = build_coach_feedback_engine_from_env(
         engine_name="llm",
         provider=None,
@@ -725,7 +1112,7 @@ def test_build_coach_feedback_engine_defaults_to_gemini_flash() -> None:
 
     assert isinstance(engine, LLMCoachFeedbackEngine)
     assert engine.provider_name == "gemini"
-    assert engine.model_name == "gemini-3-flash-preview"
+    assert engine.model_name == "gemini-3.1-flash-lite-preview"
 
 
 def test_llm_engine_can_drive_coach_feedback(
@@ -767,7 +1154,7 @@ def test_llm_engine_can_drive_coach_feedback(
             store=AnalysisStore(),
             coach_feedback_engine=LLMCoachFeedbackEngine(
                 provider="gemini",
-                model="gemini-3-flash-preview",
+                model="gemini-3.1-flash-lite-preview",
                 model_override=FunctionModel(fake_model_function),
             ),
             cv_pipeline=FakeCVPipeline(),
@@ -787,7 +1174,7 @@ def test_llm_engine_can_drive_coach_feedback(
     assert report_response.json()["coach_view"]["summary"] == "AI summary"
     assert report_response.json()["generation_mode"] == "ai"
     assert report_response.json()["llm_provider"] == "gemini"
-    assert report_response.json()["llm_model"] == "gemini-3-flash-preview"
+    assert report_response.json()["llm_model"] == "gemini-3.1-flash-lite-preview"
     assert report_response.json()["ai_rationale"]["summary"] == "AI rationale"
 
 
@@ -908,12 +1295,13 @@ def test_rerun_after_failure_produces_new_report(
             self,
             match_type: MatchType,
             video_duration_seconds: float | None = None,
+            **kwargs,
         ):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
                 raise RuntimeError("transient failure")
-            return super()._build_analytics(match_type, video_duration_seconds)
+            return super()._build_analytics(match_type, video_duration_seconds, **kwargs)
 
     monkeypatch.setattr(
         main_module,

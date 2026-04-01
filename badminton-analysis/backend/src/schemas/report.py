@@ -46,6 +46,10 @@ class ShotSelectionEvent(BaseModel):
     decision_quality: Literal["strong", "neutral", "poor"]
     recommendation: str
     evidence: str
+    clip_start_seconds: int
+    clip_end_seconds: int
+    rendered_clip_url: str | None = None
+    rendered_clip_media_type: str | None = None
 
 
 class ShotSelectionMetrics(BaseModel):
@@ -66,6 +70,10 @@ class PressureWindow(BaseModel):
     start_timestamp: str
     end_timestamp: str
     summary: str
+    clip_start_seconds: int | None = None
+    clip_end_seconds: int | None = None
+    rendered_clip_url: str | None = None
+    rendered_clip_media_type: str | None = None
 
 
 class ShuttleMetrics(BaseModel):

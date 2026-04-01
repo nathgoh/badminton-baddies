@@ -16,7 +16,7 @@ uv run ty check src
 
 - Leave `COACH_FEEDBACK_ENGINE` unset to use the deterministic placeholder coach engine.
 - Set `COACH_FEEDBACK_ENGINE=llm` to use the provider-configurable AI adapter.
-- Set `LLM_PROVIDER=gemini` and `LLM_MODEL=gemini-3-flash-preview` for the default Gemini path.
+- Set `LLM_PROVIDER=gemini` and `LLM_MODEL=gemini-3.1-flash-lite-preview` for the default Gemini path.
 - Set `LLM_MODEL=gemini-3-pro-preview` to trade latency and cost for stronger synthesis.
 - Set `GEMINI_API_KEY` for Gemini requests.
 - Set `LLM_PROVIDER=openai` or `LLM_PROVIDER=anthropic` to route through the generic typed adapter.

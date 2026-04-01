@@ -159,6 +159,10 @@ const completedReport = {
           decision_quality: "neutral",
           recommendation: "A steep drop would likely have been higher percentage here.",
           evidence: "Balance and opponent depth favored a softer attacking option.",
+          clip_start_seconds: 9,
+          clip_end_seconds: 15,
+          rendered_clip_url: "/api/analyses/analysis-123/clips/shot-00-12-smash",
+          rendered_clip_media_type: "video/mp4",
         },
       ],
     },
@@ -173,6 +177,10 @@ const completedReport = {
           start_timestamp: "00:10",
           end_timestamp: "00:18",
           summary: "Repeated forecourt interceptions kept pressure on the opponent.",
+          clip_start_seconds: 8,
+          clip_end_seconds: 20,
+          rendered_clip_url: "/api/analyses/analysis-123/clips/pressure-1-00-10-00-18-forecourt-pressure",
+          rendered_clip_media_type: "video/mp4",
         },
       ],
       heatmap: [
@@ -183,7 +191,7 @@ const completedReport = {
     },
   },
   llm_provider: "gemini",
-  llm_model: "gemini-3-flash-preview",
+  llm_model: "gemini-3.1-flash-lite-preview",
   generation_mode: "ai",
   analysis_evidence: {
     movement_summary: "Tracked distance 54.2m with recovery score 74.",
@@ -199,6 +207,10 @@ const completedReport = {
           start_timestamp: "00:10",
           end_timestamp: "00:18",
           summary: "Repeated forecourt interceptions kept pressure on the opponent.",
+          clip_start_seconds: 8,
+          clip_end_seconds: 20,
+          rendered_clip_url: "/api/analyses/analysis-123/clips/pressure-1-00-10-00-18-forecourt-pressure",
+          rendered_clip_media_type: "video/mp4",
         },
       ],
       heatmap: [{ zone: "front-centre", weight: 0.34 }],
@@ -456,7 +468,7 @@ test("streams live frame updates and renders the expanded coach and analytics re
   expect(screen.getByText(/footwork notes/i)).toBeInTheDocument();
   expect(screen.getByText(/positioning notes/i)).toBeInTheDocument();
   expect(screen.getByText(/confidence notes/i)).toBeInTheDocument();
-  expect(screen.getAllByText(/gemini-3-flash-preview/i).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/gemini-3.1-flash-lite-preview/i).length).toBeGreaterThan(0);
   expect(
     screen.getByText(/the model weighted shuttle pressure and recovery timing most heavily/i),
   ).toBeInTheDocument();
@@ -472,6 +484,173 @@ test("streams live frame updates and renders the expanded coach and analytics re
   expect(screen.getByText(/shuttle evidence/i)).toBeInTheDocument();
   expect(screen.getByText(/birdie pressure stayed front-court heavy/i)).toBeInTheDocument();
   expect(screen.getByText(/shuttle path was inferred from sampled events/i)).toBeInTheDocument();
+});
+
+test("prefers an annotated report clip when the backend provides one", async () => {
+  queueFetchResponses([
+    {
+      status: 201,
+      body: {
+        analysis_id: "analysis-123",
+        youtube_url: "https://www.youtube.com/watch?v=badminton-demo",
+        match_type: "mixed_doubles",
+        selection_required: true,
+        stage: "setup_required",
+        created_at: "2026-03-30T20:00:00Z",
+      },
+    },
+    { body: setupResponse },
+    {
+      status: 202,
+      body: {
+        analysis_id: "analysis-123",
+        stage: "ready_to_run",
+        message: "Player selection saved. Analysis is ready to run.",
+      },
+    },
+    {
+      status: 202,
+      body: {
+        analysis_id: "analysis-123",
+        stage: "analyzing",
+        message: "Analysis started. Connect to the feed for live updates.",
+      },
+    },
+    {
+      body: {
+        analysis_id: "analysis-123",
+        stage: "completed",
+        progress_percent: 100,
+        message: "Report generated successfully.",
+        warnings: [],
+        error_details: null,
+      },
+    },
+    { body: completedReport },
+  ]);
+  vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
+
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: /create analysis/i }));
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: /player 1/i })).toBeInTheDocument();
+  });
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /player 1/i }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /save setup and run/i }));
+    await flushMicrotasks();
+  });
+
+  await act(async () => {
+    MockEventSource.latest().emitDone();
+    await flushMicrotasks();
+  });
+
+  fireEvent.click(screen.getByRole("tab", { name: /analytics view/i }));
+  fireEvent.click(screen.getByRole("button", { name: /load clip for 00:12 smash/i }));
+
+  const video = screen.getByTitle(/annotated report clip/i);
+  expect(video).toHaveAttribute("src", "/api/analyses/analysis-123/clips/shot-00-12-smash");
+  expect(screen.getByText(/annotated clip • 00:12 smash • 9s-15s/i)).toBeInTheDocument();
+});
+
+test("falls back to the shared YouTube clip player when no rendered clip exists", async () => {
+  queueFetchResponses([
+    {
+      status: 201,
+      body: {
+        analysis_id: "analysis-123",
+        youtube_url: "https://www.youtube.com/watch?v=badminton-demo",
+        match_type: "mixed_doubles",
+        selection_required: true,
+        stage: "setup_required",
+        created_at: "2026-03-30T20:00:00Z",
+      },
+    },
+    { body: setupResponse },
+    {
+      status: 202,
+      body: {
+        analysis_id: "analysis-123",
+        stage: "ready_to_run",
+        message: "Player selection saved. Analysis is ready to run.",
+      },
+    },
+    {
+      status: 202,
+      body: {
+        analysis_id: "analysis-123",
+        stage: "analyzing",
+        message: "Analysis started. Connect to the feed for live updates.",
+      },
+    },
+    {
+      body: {
+        analysis_id: "analysis-123",
+        stage: "completed",
+        progress_percent: 100,
+        message: "Report generated successfully.",
+        warnings: [],
+        error_details: null,
+      },
+    },
+    {
+      body: {
+        ...completedReport,
+        analytics_view: {
+          ...completedReport.analytics_view,
+          shot_selection: {
+            ...completedReport.analytics_view.shot_selection,
+            events: [
+              {
+                ...completedReport.analytics_view.shot_selection.events[0],
+                rendered_clip_url: null,
+                rendered_clip_media_type: null,
+              },
+            ],
+          },
+        },
+      },
+    },
+  ]);
+  vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
+
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: /create analysis/i }));
+
+  await waitFor(() => {
+    expect(screen.getByRole("button", { name: /player 1/i })).toBeInTheDocument();
+  });
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /player 1/i }));
+    await flushMicrotasks();
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /save setup and run/i }));
+    await flushMicrotasks();
+  });
+
+  await act(async () => {
+    MockEventSource.latest().emitDone();
+    await flushMicrotasks();
+  });
+
+  fireEvent.click(screen.getByRole("tab", { name: /analytics view/i }));
+  fireEvent.click(screen.getByRole("button", { name: /load clip for 00:12 smash/i }));
+
+  const iframe = screen.getByTitle(/report clip player/i);
+  expect(iframe).toHaveAttribute("src", expect.stringContaining("/embed/badminton-demo"));
+  expect(iframe).toHaveAttribute("src", expect.stringContaining("start=9"));
+  expect(iframe).toHaveAttribute("src", expect.stringContaining("end=15"));
+  expect(screen.getByText(/youtube fallback • 00:12 smash • 9s-15s/i)).toBeInTheDocument();
 });
 
 test("analyze another video button resets to the analyze screen", async () => {

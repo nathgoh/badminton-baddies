@@ -141,6 +141,10 @@ export interface ShotSelectionEvent {
   decision_quality: "strong" | "neutral" | "poor";
   recommendation: string;
   evidence: string;
+  clip_start_seconds: number;
+  clip_end_seconds: number;
+  rendered_clip_url?: string | null;
+  rendered_clip_media_type?: string | null;
 }
 
 export interface ShotSelectionMetrics {
@@ -161,6 +165,19 @@ export interface PressureWindow {
   start_timestamp: string;
   end_timestamp: string;
   summary: string;
+  clip_start_seconds?: number | null;
+  clip_end_seconds?: number | null;
+  rendered_clip_url?: string | null;
+  rendered_clip_media_type?: string | null;
+}
+
+export interface ReportClipSelection {
+  title: string;
+  startSeconds: number;
+  endSeconds: number;
+  assetLabel: string;
+  renderedClipUrl?: string | null;
+  renderedClipMediaType?: string | null;
 }
 
 export interface ShuttleMetrics {

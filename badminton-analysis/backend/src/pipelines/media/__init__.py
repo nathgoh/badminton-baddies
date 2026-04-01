@@ -3,6 +3,7 @@ from .pipeline import (
     MediaPreparationError,
     MockMediaArtifactPipeline,
     PreparedMediaArtifacts,
+    RenderedClipArtifact,
     ShellMediaArtifactPipeline,
     build_media_artifact_pipeline_from_env,
 )
@@ -12,6 +13,7 @@ __all__ = [
     "MediaPreparationError",
     "MockMediaArtifactPipeline",
     "PreparedMediaArtifacts",
+    "RenderedClipArtifact",
     "ShellMediaArtifactPipeline",
     "build_media_artifact_pipeline_from_env",
 ]

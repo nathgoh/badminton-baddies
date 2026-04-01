@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import logging
+import re
 import threading
 from base64 import b64encode
 from collections.abc import Callable
 from datetime import UTC, datetime
+from importlib import import_module
 from pathlib import Path
 from typing import Literal
 
 from fastapi import HTTPException, status
 
 from coaching.engine import CoachFeedbackEngine, PlaceholderCoachFeedbackEngine
+from pipelines.cv.overlay import draw_player_pose_overlay
 from pipelines.cv.pipeline import CVPipeline, _default_court, _default_players, _player_count
 from pipelines.media.pipeline import MediaArtifactPipeline, MediaPreparationError
 from schemas import (
@@ -39,6 +43,7 @@ from schemas import (
     SetupDetectionResult,
     ShotSelectionEvent,
     ShotSelectionMetrics,
+    ShuttleSample,
     TrackingResult,
 )
 
@@ -46,6 +51,8 @@ from .evidence import build_analysis_evidence, build_shuttle_metrics
 from .feed import AnalysisFeedManager
 from .progress import ANALYZING_PROGRESS_STEPS
 from .store import AnalysisStore
+
+logger = logging.getLogger(__name__)
 
 
 def _build_setup_frame_url(analysis_id: str) -> str:
@@ -70,6 +77,28 @@ def _format_timestamp(seconds: float) -> str:
     return f"{m:02d}:{s:02d}"
 
 
+def _slugify_clip_component(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return normalized or "clip"
+
+
+def _build_report_clip_url(analysis_id: str, clip_id: str) -> str:
+    return f"/api/analyses/{analysis_id}/clips/{clip_id}"
+
+
+def _shot_clip_id(event: ShotSelectionEvent) -> str:
+    return f"shot-{event.timestamp.replace(':', '-')}-{_slugify_clip_component(event.shot_type)}"
+
+
+def _pressure_window_clip_id(window_index: int, label: str, start: str, end: str) -> str:
+    return (
+        f"pressure-{window_index + 1}-"
+        f"{start.replace(':', '-')}-"
+        f"{end.replace(':', '-')}-"
+        f"{_slugify_clip_component(label)}"
+    )
+
+
 def _decision_quality(decision_score: int) -> Literal["strong", "neutral", "poor"]:
     if decision_score >= 70:
         return "strong"
@@ -86,6 +115,8 @@ def _build_shot_event(
     decision_score: int,
     recommendation: str,
     evidence: str,
+    clip_start_seconds: int,
+    clip_end_seconds: int,
 ) -> ShotSelectionEvent:
     return ShotSelectionEvent(
         timestamp=timestamp,
@@ -95,6 +126,8 @@ def _build_shot_event(
         decision_quality=_decision_quality(decision_score),
         recommendation=recommendation,
         evidence=evidence,
+        clip_start_seconds=clip_start_seconds,
+        clip_end_seconds=clip_end_seconds,
     )
 
 
@@ -301,8 +334,37 @@ class AnalysisService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Setup frame not available.",
-            )
+        )
         return path, record.setup_frame_content_type or "application/octet-stream"
+
+    def get_rendered_clip_file(
+        self,
+        analysis_id: str,
+        clip_id: str,
+        *,
+        owner_id: str | None = None,
+    ) -> tuple[Path, str]:
+        self._get_record(analysis_id, owner_id=owner_id)
+        if self._media_artifact_pipeline is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Rendered clip not available.",
+            )
+
+        resolver = getattr(self._media_artifact_pipeline, "get_rendered_clip_file", None)
+        if not callable(resolver):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Rendered clip not available.",
+            )
+
+        path, media_type = resolver(analysis_id, clip_id)
+        if not path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Rendered clip not available.",
+            )
+        return path, media_type
 
     def delete_analysis(self, analysis_id: str, *, owner_id: str | None = None) -> None:
         record = self._get_record(analysis_id, owner_id=owner_id)
@@ -408,6 +470,7 @@ class AnalysisService:
         tracked_player = self._find_player(record, record.selected_player_id)
         tracking_summary: PlayerTrackSummary | None = None
         pose_summary: PoseSummary | None = None
+        tracking_result: TrackingResult | None = None
 
         if self._cv_pipeline is not None and record.source_video_path is not None:
             tracking_result = self._run_tracking(record)
@@ -423,15 +486,47 @@ class AnalysisService:
             record.pose_summary = pose_summary
             record.warnings = [*record.warnings, *pose_summary.warnings]
 
+        # Visual shot analysis via Gemini (if tracking data is available)
+        visual_shot_selection: ShotSelectionMetrics | None = None
+        if (
+            tracking_summary is not None
+            and record.source_video_path is not None
+            and tracking_summary.samples
+        ):
+            self._push_stage_event(
+                record,
+                stage="shot_analysis",
+                progress_percent=85,
+                message="Analyzing shot selection from key frames...",
+            )
+            visual_shot_selection = self._run_visual_shot_analysis(
+                record, tracking_summary
+            )
+
         self._push_stage_event(
             record,
             stage="analytics",
-            progress_percent=85,
+            progress_percent=90,
             message="Building analytics and evidence...",
         )
-        analytics = self._build_analytics(record.match_type, record.video_duration_seconds)
+        analytics = self._build_analytics(
+            record.match_type,
+            record.video_duration_seconds,
+            shot_selection_override=visual_shot_selection,
+        )
         analytics = self._apply_cv_analytics(
             analytics,
+            tracking_summary=tracking_summary,
+            pose_summary=pose_summary,
+            observed_shuttle_samples=(
+                tracking_result.observed_shuttle_samples
+                if record.tracking_result is not None
+                else None
+            ),
+        )
+        analytics = self._attach_rendered_report_clips(
+            record,
+            analytics=analytics,
             tracking_summary=tracking_summary,
             pose_summary=pose_summary,
         )
@@ -444,11 +539,16 @@ class AnalysisService:
             analytics,
             tracking_summary=tracking_summary,
             pose_summary=pose_summary,
+            observed_shuttle_samples=(
+                tracking_result.observed_shuttle_samples
+                if record.tracking_result is not None
+                else None
+            ),
         )
         self._push_stage_event(
             record,
             stage="coaching",
-            progress_percent=92,
+            progress_percent=95,
             message="Generating coaching feedback...",
         )
         coach_feedback = self._create_coach_view(
@@ -643,26 +743,44 @@ class AnalysisService:
             return TrackingResult(tracks=[], warnings=[])
 
         on_frame = self._make_frame_callback(record, "tracking")
+        selected_player = self._find_player_safe(record, record.selected_player_id)
         raw_result = self._cv_pipeline.track_players(
             record.source_video_path,
             record.court,
             record.match_type,
+            selected_player=selected_player,
             on_frame=on_frame,
         )
         raw_tracks = getattr(raw_result, "tracks", [])
         if isinstance(raw_tracks, dict):
             raw_tracks = list(raw_tracks.values())
+        focused_track_id = getattr(raw_result, "focused_track_id", None)
         warnings = list(getattr(raw_result, "warnings", []))
+        observed_shuttle_samples = getattr(raw_result, "observed_shuttle_samples", [])
         tracks = [
             PlayerTrackSummary.model_validate(track, from_attributes=True) for track in raw_tracks
         ]
-        return TrackingResult(tracks=tracks, warnings=warnings)
+        return TrackingResult(
+            tracks=tracks,
+            focused_track_id=focused_track_id,
+            observed_shuttle_samples=[
+                ShuttleSample.model_validate(sample, from_attributes=True)
+                for sample in observed_shuttle_samples
+            ],
+            warnings=warnings,
+        )
 
     def _select_track_for_player(
         self,
         record: AnalysisRecord,
         tracking_result: TrackingResult,
     ) -> PlayerTrackSummary | None:
+        if tracking_result.focused_track_id is not None:
+            for track in tracking_result.tracks:
+                if track.track_id == tracking_result.focused_track_id:
+                    return track
+            return None
+
         # Try exact ID match first (works with mock/fake pipelines)
         for track in tracking_result.tracks:
             if track.source_player_id == record.selected_player_id:
@@ -674,39 +792,6 @@ class AnalysisService:
             for track in tracking_result.tracks:
                 if track.track_id == record.selected_track_id:
                     return track
-
-        if len(tracking_result.tracks) == 1:
-            return tracking_result.tracks[0]
-
-        # Spatial match: find the track whose samples are closest to the
-        # selected player's bounding box position from the setup frame
-        selected_player = self._find_player_safe(record, record.selected_player_id)
-        if selected_player is not None and selected_player.bounding_box is not None:
-            from math import hypot
-
-            player_cx = selected_player.bounding_box.x + selected_player.bounding_box.width / 2
-            player_cy = selected_player.bounding_box.y + selected_player.bounding_box.height / 2
-
-            best_track: PlayerTrackSummary | None = None
-            best_dist = float("inf")
-            for track in tracking_result.tracks:
-                if not track.samples:
-                    continue
-                # Use average position of first few samples
-                sample_slice = track.samples[: min(5, len(track.samples))]
-                avg_x = sum(s.x for s in sample_slice) / len(sample_slice)
-                avg_y = sum(s.y for s in sample_slice) / len(sample_slice)
-                dist = hypot(avg_x - player_cx, avg_y - player_cy)
-                if dist < best_dist:
-                    best_dist = dist
-                    best_track = track
-
-            if best_track is not None:
-                return best_track
-
-        # Last resort: pick the track with the most samples (likely the main player)
-        if tracking_result.tracks:
-            return max(tracking_result.tracks, key=lambda t: len(t.samples))
 
         return None
 
@@ -744,8 +829,41 @@ class AnalysisService:
         )
         return PoseSummary.model_validate(raw_summary, from_attributes=True)
 
+    def _run_visual_shot_analysis(
+        self,
+        record: AnalysisRecord,
+        tracking_summary: PlayerTrackSummary,
+    ) -> ShotSelectionMetrics | None:
+        """Run Gemini visual shot analysis on key frames. Returns None on failure."""
+        from .shot_analysis import analyze_shots_from_frames
+
+        try:
+            result = analyze_shots_from_frames(
+                video_path=record.source_video_path,
+                tracking_summary=tracking_summary,
+                match_type=record.match_type,
+                video_duration_seconds=record.video_duration_seconds,
+            )
+            if result.events:
+                return result
+            record.warnings = [
+                *record.warnings,
+                "Visual shot analysis returned no events; using template shots.",
+            ]
+        except Exception as exc:
+            logger.warning("Visual shot analysis failed: %s", exc)
+            record.warnings = [
+                *record.warnings,
+                f"Visual shot analysis unavailable ({exc}); using template shots.",
+            ]
+        return None
+
     def _build_analytics(
-        self, match_type: MatchType, video_duration_seconds: float | None = None
+        self,
+        match_type: MatchType,
+        video_duration_seconds: float | None = None,
+        *,
+        shot_selection_override: ShotSelectionMetrics | None = None,
     ) -> AnalyticsView:
         singles = match_type in {MatchType.MENS_SINGLES, MatchType.WOMENS_SINGLES}
 
@@ -798,7 +916,9 @@ class AnalysisService:
             burst_count = 8
             directional_balance = {"left": 0.51, "right": 0.49}
 
-        shot_selection = self._build_shot_selection(video_duration_seconds)
+        shot_selection = shot_selection_override or self._build_shot_selection(
+            video_duration_seconds
+        )
         shuttle = build_shuttle_metrics(shot_selection, tracking_summary=None)
 
         return AnalyticsView(
@@ -937,17 +1057,22 @@ class AnalysisService:
             ),
         ]
 
-        events = [
-            _build_shot_event(
-                timestamp=_format_timestamp(fraction * duration),
-                shot_type=shot_type,
-                execution_score=exec_score,
-                decision_score=dec_score,
-                recommendation=rec,
-                evidence=evidence,
+        events: list[ShotSelectionEvent] = []
+        duration_seconds = max(int(duration), 1)
+        for fraction, shot_type, exec_score, dec_score, rec, evidence in event_templates:
+            event_seconds = min(int(fraction * duration), duration_seconds)
+            events.append(
+                _build_shot_event(
+                    timestamp=_format_timestamp(event_seconds),
+                    shot_type=shot_type,
+                    execution_score=exec_score,
+                    decision_score=dec_score,
+                    recommendation=rec,
+                    evidence=evidence,
+                    clip_start_seconds=max(0, event_seconds - 3),
+                    clip_end_seconds=min(duration_seconds, event_seconds + 3),
+                )
             )
-            for fraction, shot_type, exec_score, dec_score, rec, evidence in event_templates
-        ]
 
         return ShotSelectionMetrics(
             overview=(
@@ -963,6 +1088,7 @@ class AnalysisService:
         *,
         tracking_summary: PlayerTrackSummary | None,
         pose_summary: PoseSummary | None,
+        observed_shuttle_samples=None,
     ) -> AnalyticsView:
         mechanics = analytics.mechanics
         movement = analytics.movement
@@ -995,6 +1121,7 @@ class AnalysisService:
         shuttle = build_shuttle_metrics(
             analytics.shot_selection,
             tracking_summary=tracking_summary,
+            observed_samples=observed_shuttle_samples,
         )
 
         return AnalyticsView(
@@ -1005,12 +1132,176 @@ class AnalysisService:
             shuttle=shuttle,
         )
 
+    def _attach_rendered_report_clips(
+        self,
+        record: AnalysisRecord,
+        *,
+        analytics: AnalyticsView,
+        tracking_summary: PlayerTrackSummary | None,
+        pose_summary: PoseSummary | None,
+    ) -> AnalyticsView:
+        if self._media_artifact_pipeline is None or record.source_video_path is None:
+            return analytics
+
+        render_clip = getattr(self._media_artifact_pipeline, "render_report_clip", None)
+        if not callable(render_clip):
+            return analytics
+
+        annotate_frame = self._make_report_clip_annotator(
+            tracking_summary=tracking_summary,
+            pose_summary=pose_summary,
+        )
+
+        rendered_events = [
+            self._attach_rendered_clip_to_event(
+                record,
+                event,
+                clip_id=_shot_clip_id(event),
+                annotate_frame=annotate_frame,
+            )
+            for event in analytics.shot_selection.events
+        ]
+        rendered_windows = [
+            self._attach_rendered_clip_to_pressure_window(
+                record,
+                window,
+                clip_id=_pressure_window_clip_id(
+                    index,
+                    window.label,
+                    window.start_timestamp,
+                    window.end_timestamp,
+                ),
+                annotate_frame=annotate_frame,
+            )
+            for index, window in enumerate(analytics.shuttle.pressure_windows)
+        ]
+
+        return AnalyticsView(
+            mechanics=analytics.mechanics,
+            movement=analytics.movement,
+            positioning=analytics.positioning,
+            shot_selection=analytics.shot_selection.model_copy(update={"events": rendered_events}),
+            shuttle=analytics.shuttle.model_copy(update={"pressure_windows": rendered_windows}),
+        )
+
+    def _attach_rendered_clip_to_event(
+        self,
+        record: AnalysisRecord,
+        event: ShotSelectionEvent,
+        *,
+        clip_id: str,
+        annotate_frame: Callable[[object, int], object],
+    ) -> ShotSelectionEvent:
+        rendered_clip_url, rendered_clip_media_type = self._render_report_clip(
+            record,
+            clip_id=clip_id,
+            clip_start_seconds=event.clip_start_seconds,
+            clip_end_seconds=event.clip_end_seconds,
+            annotate_frame=annotate_frame,
+        )
+        return event.model_copy(
+            update={
+                "rendered_clip_url": rendered_clip_url,
+                "rendered_clip_media_type": rendered_clip_media_type,
+            }
+        )
+
+    def _attach_rendered_clip_to_pressure_window(
+        self,
+        record: AnalysisRecord,
+        window,
+        *,
+        clip_id: str,
+        annotate_frame: Callable[[object, int], object],
+    ):
+        if window.clip_start_seconds is None or window.clip_end_seconds is None:
+            return window
+        rendered_clip_url, rendered_clip_media_type = self._render_report_clip(
+            record,
+            clip_id=clip_id,
+            clip_start_seconds=window.clip_start_seconds,
+            clip_end_seconds=window.clip_end_seconds,
+            annotate_frame=annotate_frame,
+        )
+        return window.model_copy(
+            update={
+                "rendered_clip_url": rendered_clip_url,
+                "rendered_clip_media_type": rendered_clip_media_type,
+            }
+        )
+
+    def _render_report_clip(
+        self,
+        record: AnalysisRecord,
+        *,
+        clip_id: str,
+        clip_start_seconds: int,
+        clip_end_seconds: int,
+        annotate_frame: Callable[[object, int], object],
+    ) -> tuple[str | None, str | None]:
+        if (
+            self._media_artifact_pipeline is None
+            or record.source_video_path is None
+            or clip_start_seconds >= clip_end_seconds
+        ):
+            return None, None
+
+        render_clip = getattr(self._media_artifact_pipeline, "render_report_clip", None)
+        if not callable(render_clip):
+            return None, None
+
+        try:
+            artifact = render_clip(
+                analysis_id=record.analysis_id,
+                clip_id=clip_id,
+                source_video_path=record.source_video_path,
+                clip_start_seconds=clip_start_seconds,
+                clip_end_seconds=clip_end_seconds,
+                annotate_frame=annotate_frame,
+            )
+        except Exception as exc:
+            warning = f"Annotated clip fallback applied after {exc}."
+            if warning not in record.warnings:
+                record.warnings = [*record.warnings, warning]
+            return None, None
+
+        return _build_report_clip_url(record.analysis_id, artifact.clip_id), artifact.media_type
+
+    def _make_report_clip_annotator(
+        self,
+        *,
+        tracking_summary: PlayerTrackSummary | None,
+        pose_summary: PoseSummary | None,
+    ) -> Callable[[object, int], object]:
+        cv2 = import_module("cv2")
+        samples = tracking_summary.samples if tracking_summary is not None else []
+        pose_frames = pose_summary.pose_frames if pose_summary is not None else []
+
+        def annotate(frame: object, frame_index: int) -> object:
+            sample = self._nearest_frame_match(samples, frame_index)
+            pose_frame = self._nearest_frame_match(pose_frames, frame_index)
+            poses = [pose_frame.landmarks] if pose_frame is not None else None
+            return draw_player_pose_overlay(
+                cv2,
+                frame,
+                box=sample.bounding_box if sample is not None else None,
+                poses=poses,
+            )
+
+        return annotate
+
+    def _nearest_frame_match(self, items: list[object], frame_index: int) -> object | None:
+        if not items:
+            return None
+        return min(items, key=lambda item: abs(getattr(item, "frame_index", 0) - frame_index))
+
     def _build_confidence_annotations(
         self,
         analytics: AnalyticsView,
         *,
         tracking_summary: PlayerTrackSummary | None = None,
         pose_summary: PoseSummary | None = None,
+        observed_shuttle_samples: list[ShuttleSample] | None = None,
     ) -> list[ConfidenceAnnotation]:
         movement_reason = (
             "Mocked movement analysis uses a limited rally sample rather than real CV."
@@ -1038,6 +1329,7 @@ class AnalysisService:
         stance_confidence = (
             0.72 if pose_summary is not None and pose_summary.sample_count > 0 else 0.58
         )
+        shuttle_observed = bool(observed_shuttle_samples)
         return [
             ConfidenceAnnotation(
                 field="analytics.movement.recovery_score",
@@ -1069,11 +1361,22 @@ class AnalysisService:
             ),
             ConfidenceAnnotation(
                 field="analytics.shuttle.heatmap",
-                confidence=0.67 if tracking_summary is not None else 0.41,
+                confidence=0.86
+                if shuttle_observed
+                else (0.67 if tracking_summary is not None else 0.41),
                 reason=(
-                    "Shuttle density is inferred from shot context plus tracked-player movement."
-                    if tracking_summary is not None
-                    else "Shuttle density is inferred from shot context without direct shuttle CV."
+                    "Shuttle density is anchored by directly observed shuttle samples and "
+                    "smoothed into zone density."
+                    if shuttle_observed
+                    else (
+                        "Shuttle density is inferred from shot context plus tracked-player "
+                        "movement."
+                        if tracking_summary is not None
+                        else (
+                            "Shuttle density is inferred from shot context without direct "
+                            "shuttle CV."
+                        )
+                    )
                 ),
             ),
         ]
